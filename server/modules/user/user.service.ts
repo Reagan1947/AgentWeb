@@ -6,11 +6,11 @@ type GitConfig = {
   git_email: string | null;
 };
 
-/** One chat scope's unsent composer text and queued message. */
+/** One chat scope's unsent composer text and the turns waiting to be sent. */
 type DraftRecord = {
   scope: string;
   text: string;
-  queuedMessage: unknown | null;
+  queuedMessages: QueuedChatMessage[];
   updatedAt: string;
 };
 
@@ -33,7 +33,9 @@ type UserDependencies = {
       userId: number,
       scope: string,
       message: QueuedChatMessage,
-    ): { queuedMessage: QueuedChatMessage; appended: boolean } | null;
+      index?: number | null,
+    ): { queuedMessages: QueuedChatMessage[] };
+    removeQueuedMessage(userId: number, scope: string, id: string): void;
     clearQueuedMessage(userId: number, scope: string): void;
     deleteDraft(userId: number, scope: string): void;
   };
@@ -81,7 +83,9 @@ const readQueuedMessageInput = (value: unknown): QueuedChatMessage => {
       statusCode: 400,
     });
   }
+  const id = typeof message.id === 'string' && message.id.trim() ? message.id.trim() : undefined;
   return {
+    ...(id ? { id } : {}),
     content,
     ...(isPlainObject(message.options) ? { options: message.options } : {}),
     attachments,
@@ -221,25 +225,34 @@ export function createUserService(dependencies: UserDependencies) {
     },
 
     /**
-     * Queues a message behind the session's running turn. A message already
-     * waiting there is kept and this one is added after it, so a burst of
-     * follow-ups all reach the provider, in order, as the next turn.
-     *
-     * A slash command is the one exception: it only works as a turn of its
-     * own, so it is refused rather than merged, and the composer keeps it.
+     * Queues a message behind the session's running turn, as its own turn.
+     * Messages already waiting stay where they are. `index` inserts it at
+     * that position. An id already in the queue replaces that turn in place,
+     * which is how the composer writes an edit back.
      */
-    appendQueuedMessage(userId: number, scopeInput: unknown, queuedMessageInput: unknown) {
+    appendQueuedMessage(
+      userId: number,
+      scopeInput: unknown,
+      queuedMessageInput: unknown,
+      index?: number | null,
+    ) {
       const scope = readDraftScope(scopeInput);
       const message = readQueuedMessageInput(queuedMessageInput);
-      const result = dependencies.drafts.appendQueuedMessage(userId, scope, message);
-      if (!result) {
-        throw new AppError(
-          'A slash command runs as a turn of its own, so it cannot be combined with the queued message. '
-            + 'Send it after the queued message has gone.',
-          { code: 'QUEUED_MESSAGE_NOT_COMBINABLE', statusCode: 409 },
-        );
+      const result = dependencies.drafts.appendQueuedMessage(userId, scope, message, index);
+      return { success: true, queuedMessages: result.queuedMessages };
+    },
+
+    /** Removes one queued turn. An unknown id leaves the queue as it is. */
+    removeQueuedMessage(userId: number, scopeInput: unknown, idInput: unknown) {
+      const id = typeof idInput === 'string' ? idInput.trim() : '';
+      if (!id || id.length > MAX_KEY_LENGTH) {
+        throw new AppError('A queued message id is required', {
+          code: 'INVALID_QUEUED_MESSAGE',
+          statusCode: 400,
+        });
       }
-      return { success: true, queuedMessage: result.queuedMessage, appended: result.appended };
+      dependencies.drafts.removeQueuedMessage(userId, readDraftScope(scopeInput), id);
+      return { success: true };
     },
 
     clearQueuedMessage(userId: number, scopeInput: unknown) {

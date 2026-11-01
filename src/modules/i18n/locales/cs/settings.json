@@ -84,6 +84,23 @@
       "openPanel": "Otevřít panel nastavení",
       "draggingStatus": "Přetahování...",
       "toggleAndMove": "Kliknutím přepnete, přetažením přesunete"
+    },
+    "tabs": {
+      "commands": "Příkazy"
+    },
+    "commands": {
+      "searchPlaceholder": "Hledat příkazy…",
+      "noProject": "Vyberte projekt, abyste viděli jeho příkazy.",
+      "loading": "Načítání příkazů…",
+      "empty": "Pro tento projekt nejsou k dispozici žádné příkazy.",
+      "noMatches": "Vyhledávání neodpovídá žádnému příkazu.",
+      "loadError": "Příkazy se nepodařilo načíst.",
+      "groups": {
+        "builtIn": "Vestavěné",
+        "custom": "Vlastní",
+        "skills": "Dovednosti"
+      },
+      "insertTitle": "Vložit {{command}} do chatu"
     }
   },
   "terminalShortcuts": {
@@ -106,6 +123,7 @@
     "label": "Nastavení",
     "agents": "Agenti",
     "appearance": "Vzhled",
+    "commands": "Příkazy",
     "git": "Git",
     "apiTokens": "API a tokeny",
     "voice": "Hlas",
@@ -348,6 +366,9 @@
     }
   },
   "agents": {
+    "list": {
+      "description": "Vyberte agenta a spravujte jeho účet, oprávnění a nástroje."
+    },
     "authStatus": {
       "checking": "Ověřování...",
       "connected": "Připojeno",

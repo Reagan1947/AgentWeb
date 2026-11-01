@@ -3,25 +3,23 @@ import assert from 'node:assert/strict';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, test, vi } from 'vitest';
 
-import { i18n } from '@/modules/i18n';
 import { useChatComposerState } from '@/modules/chat/hooks/useChatComposerState';
 import { readDraftText, resetChatDrafts, writeDraftText } from '@/shared/chatDrafts';
 import type { BackgroundSendChoice, ChatMessage, PermissionMode, Project, ProjectSession, SessionActivityMap } from '@/shared/types';
 
 /**
- * #1587: follow-ups submitted while a turn runs used to replace each other in
- * the session's single queued slot, so only the last one reached the
- * provider and nothing said the others were gone. Every accepted follow-up
- * must now be kept, in order, and the card must show all of them.
+ * Follow-ups submitted while a turn runs are each their own queued turn.
+ * They used to be joined into one prompt; every accepted follow-up must now
+ * stay a separate entry, in order, and the queue must show each of them.
  *
  * The server is faked at the HTTP boundary with the drafts contract the real
  * server implements, so these tests see what would be stored in
  * `session_drafts.queued_message` (what the dispatcher sends), not only what
- * the card renders.
+ * the rows render.
  */
 
-type StoredQueued = { content: string; options?: Record<string, unknown>; attachments: unknown[] };
-type StoredDraft = { text: string; queuedMessage: StoredQueued | null };
+type StoredQueued = { id: string; content: string; options?: Record<string, unknown>; attachments: unknown[] };
+type StoredDraft = { text: string; queuedMessages: StoredQueued[] };
 
 const PROJECT: Project = { projectId: 'project-1', displayName: 'Project One', fullPath: '/tmp/project-one' };
 const SESSION_1: ProjectSession = { id: 'session-1' };
@@ -38,6 +36,7 @@ let appendGate: Promise<void> | null = null;
 // that took a slower connection would.
 let clearGate: Promise<void> | null = null;
 let appendRequestCount = 0;
+let nextQueuedId = 1;
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
   status,
@@ -46,7 +45,7 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 
 const dropIfEmpty = (scope: string) => {
   const draft = server.get(scope);
-  if (draft && !draft.text && !draft.queuedMessage) {
+  if (draft && !draft.text && draft.queuedMessages.length === 0) {
     server.delete(scope);
   }
 };
@@ -73,32 +72,47 @@ const fakeServer = async (url: RequestInfo | URL, init?: RequestInit): Promise<R
         return json({ success: false, error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } }, 500);
       }
       const message = body.queuedMessage as StoredQueued;
-      const current = server.get(scope) ?? { text: '', queuedMessage: null };
-      const waiting = current.queuedMessage;
-      const isCommand = (queued: StoredQueued) => queued.content.trimStart().startsWith('/');
-      if (waiting && (isCommand(waiting) || isCommand(message))) {
+      const current = server.get(scope) ?? { text: '', queuedMessages: [] };
+      const existingAt = typeof message.id === 'string'
+        ? current.queuedMessages.findIndex((entry) => entry.id === message.id)
+        : -1;
+      if (existingAt >= 0 && typeof message.id === 'string') {
+        const queuedMessages = current.queuedMessages.slice();
+        queuedMessages[existingAt] = {
+          id: message.id,
+          content: message.content,
+          options: message.options ?? current.queuedMessages[existingAt]?.options,
+          attachments: message.attachments ?? [],
+        };
+        server.set(scope, { ...current, queuedMessages });
         await appendGate;
-        return json({
-          success: false,
-          error: { code: 'QUEUED_MESSAGE_NOT_COMBINABLE', message: 'A slash command runs as a turn of its own' },
-        }, 409);
+        return json({ success: true, queuedMessages });
       }
-      const queuedMessage: StoredQueued = waiting
-        ? {
-            content: [waiting.content, message.content].filter((part) => part.trim()).join('\n\n'),
-            options: message.options ?? waiting.options,
-            attachments: [...waiting.attachments, ...(message.attachments ?? [])],
-          }
-        : { content: message.content, options: message.options, attachments: message.attachments ?? [] };
-      server.set(scope, { ...current, queuedMessage });
+      const id = typeof message.id === 'string' && message.id
+        ? message.id
+        : `q${nextQueuedId++}`;
+      const entry: StoredQueued = {
+        id,
+        content: message.content,
+        options: message.options,
+        attachments: message.attachments ?? [],
+      };
+      const queuedMessages = current.queuedMessages.slice();
+      const index = typeof body.index === 'number' ? body.index : queuedMessages.length;
+      queuedMessages.splice(Math.max(0, Math.min(index, queuedMessages.length)), 0, entry);
+      server.set(scope, { ...current, queuedMessages });
       await appendGate;
-      return json({ success: true, queuedMessage, appended: Boolean(waiting) });
+      return json({ success: true, queuedMessages });
     }
     if (method === 'DELETE') {
       await clearGate;
       const current = server.get(scope);
       if (current) {
-        server.set(scope, { ...current, queuedMessage: null });
+        const id = typeof body.id === 'string' ? body.id : '';
+        server.set(scope, {
+          ...current,
+          queuedMessages: id ? current.queuedMessages.filter((entry) => entry.id !== id) : [],
+        });
         dropIfEmpty(scope);
       }
       return json({ success: true });
@@ -111,10 +125,10 @@ const fakeServer = async (url: RequestInfo | URL, init?: RequestInit): Promise<R
     }
     if (method === 'PUT') {
       const text = typeof body.text === 'string' ? body.text : '';
-      const current = server.get(scope) ?? { text: '', queuedMessage: null };
+      const current = server.get(scope) ?? { text: '', queuedMessages: [] };
       server.set(scope, body.queuedMessage === undefined
         ? { ...current, text }
-        : { text, queuedMessage: (body.queuedMessage as StoredQueued | null) ?? null });
+        : { text, queuedMessages: [] });
       dropIfEmpty(scope);
       return json({ success: true });
     }
@@ -131,9 +145,9 @@ const fakeServer = async (url: RequestInfo | URL, init?: RequestInit): Promise<R
 // queued message off the queue to send it.
 const dispatcherClaims = (scope: string): StoredQueued | null => {
   const draft = server.get(scope);
-  const claimed = draft?.queuedMessage ?? null;
+  const claimed = draft?.queuedMessages[0] ?? null;
   if (draft) {
-    server.set(scope, { ...draft, queuedMessage: null });
+    server.set(scope, { ...draft, queuedMessages: draft.queuedMessages.slice(1) });
     dropIfEmpty(scope);
   }
   return claimed;
@@ -188,7 +202,8 @@ const submit = async (view: View, text: string, files: File[] = []) => {
   });
 };
 
-const queuedOnServer = (scope = 'session-1') => server.get(scope)?.queuedMessage ?? null;
+const queuedOnServer = (scope = 'session-1') => server.get(scope)?.queuedMessages ?? [];
+const queuedContents = (scope = 'session-1') => queuedOnServer(scope).map((message) => message.content);
 
 const hold = () => {
   let release!: () => void;
@@ -212,6 +227,7 @@ beforeEach(() => {
   appendGate = null;
   clearGate = null;
   appendRequestCount = 0;
+  nextQueuedId = 1;
   resetChatDrafts();
   localStorage.clear();
   vi.stubGlobal('fetch', vi.fn(fakeServer));
@@ -232,11 +248,12 @@ test('follow-ups A, B and C queued during one turn are all kept, in order, and t
   view.rerender({ session: SESSION_1, isLoading: true, model: 'model-2' });
   await submit(view, 'follow-up C');
 
-  assert.equal(queuedOnServer()?.content, 'follow-up A\n\nfollow-up B\n\nfollow-up C', 'all three will be sent, in order');
-  assert.deepEqual(queuedOnServer()?.attachments, [{ name: 'b.txt', path: '/uploads/b.txt' }]);
-  assert.equal(queuedOnServer()?.options?.model, 'model-2', 'the latest send options win');
-  assert.equal(view.result.current.queuedDraft?.content, 'follow-up A\n\nfollow-up B\n\nfollow-up C');
-  assert.equal(view.result.current.queuedDraft?.uploadedAttachments?.length, 1);
+  assert.deepEqual(queuedContents(), ['follow-up A', 'follow-up B', 'follow-up C'], 'all three will be sent, in order, as their own turns');
+  assert.deepEqual(queuedOnServer()[1]?.attachments, [{ name: 'b.txt', path: '/uploads/b.txt' }]);
+  assert.equal(queuedOnServer()[0]?.options?.model, 'model-1');
+  assert.equal(queuedOnServer()[2]?.options?.model, 'model-2', 'each turn keeps the options it was queued with');
+  assert.deepEqual(view.result.current.queuedDrafts.map((draft) => draft.content), ['follow-up A', 'follow-up B', 'follow-up C']);
+  assert.equal(view.result.current.queuedDrafts[1]?.attachments.length, 1);
   assert.equal(view.result.current.input, '');
 });
 
@@ -246,12 +263,12 @@ test('a follow-up queued after the server sent the waiting one is queued alone, 
 
   // The turn ended and the dispatcher took A, before this page heard about it.
   assert.equal(dispatcherClaims('session-1')?.content, 'follow-up A');
-  assert.equal(view.result.current.queuedDraft?.content, 'follow-up A', 'the card has not caught up yet');
+  assert.equal(view.result.current.queuedDrafts[0]?.content, 'follow-up A', 'the row has not caught up yet');
 
   await submit(view, 'follow-up B');
 
-  assert.deepEqual(queuedOnServer(), { content: 'follow-up B', options: queuedOnServer()?.options, attachments: [] });
-  assert.equal(view.result.current.queuedDraft?.content, 'follow-up B', 'the card shows what will be sent');
+  assert.deepEqual(queuedContents(), ['follow-up B']);
+  assert.equal(view.result.current.queuedDrafts[0]?.content, 'follow-up B', 'the row shows what will be sent');
 });
 
 test('typing after the server sent the queued message does not bring it back', async () => {
@@ -264,7 +281,7 @@ test('typing after the server sent the queued message does not bring it back', a
   await act(async () => { await new Promise((resolve) => setTimeout(resolve, 1_300)); });
 
   assert.equal(server.get('session-1')?.text, 'still writing the next one', 'the text was saved');
-  assert.equal(queuedOnServer(), null, 'and A, already sent, is not queued again');
+  assert.deepEqual(queuedOnServer(), [], 'and A, already sent, is not queued again');
 });
 
 test('queueing behind background work adds to a message already waiting there', async () => {
@@ -290,56 +307,83 @@ test('queueing behind background work adds to a message already waiting there', 
   await queueBehindWork('after the job: A');
   await queueBehindWork('after the job: B');
 
-  assert.equal(queuedOnServer()?.content, 'after the job: A\n\nafter the job: B');
-  assert.equal(view.result.current.queuedDraft?.content, 'after the job: A\n\nafter the job: B');
+  assert.deepEqual(queuedContents(), ['after the job: A', 'after the job: B']);
+  assert.deepEqual(view.result.current.queuedDrafts.map((draft) => draft.content), ['after the job: A', 'after the job: B']);
 });
 
-test('editing the merged card brings every follow-up back and takes it off the queue', async () => {
+test('editing one queued turn brings that turn back and leaves the others queued', async () => {
   const fileA = new File(['a'], 'a.txt', { type: 'text/plain' });
   const fileB = new File(['b'], 'b.txt', { type: 'text/plain' });
   const { view } = render();
   await submit(view, 'follow-up A', [fileA]);
   await submit(view, 'follow-up B', [fileB]);
 
-  await act(async () => { view.result.current.editQueuedDraft(); });
+  const firstId = view.result.current.queuedDrafts[0]?.id ?? '';
+  await act(async () => { view.result.current.editQueuedDraft(firstId); });
 
-  assert.equal(view.result.current.input, 'follow-up A\n\nfollow-up B');
-  assert.deepEqual(view.result.current.attachedFiles.map((file) => file.name), ['a.txt', 'b.txt']);
-  assert.equal(view.result.current.queuedDraft, null);
-  await waitFor(() => assert.equal(queuedOnServer(), null, 'nothing is left for the dispatcher to send'));
+  assert.equal(view.result.current.input, 'follow-up A');
+  assert.deepEqual(view.result.current.attachedFiles.map((file) => file.name), ['a.txt']);
+  assert.equal(view.result.current.isEditingQueuedDraft, true);
+  assert.deepEqual(view.result.current.queuedDrafts.map((draft) => draft.content), ['follow-up A', 'follow-up B']);
+  await waitFor(() => assert.deepEqual(queuedContents(), ['follow-up A', 'follow-up B']));
 });
 
-test('deleting the merged card takes the whole message off the queue', async () => {
+test('cancelling an edit puts that turn back and clears the composer', async () => {
   const { view } = render();
   await submit(view, 'follow-up A');
   await submit(view, 'follow-up B');
 
-  await act(async () => { view.result.current.deleteQueuedDraft(); });
+  const firstId = view.result.current.queuedDrafts[0]?.id ?? '';
+  await act(async () => { view.result.current.editQueuedDraft(firstId); });
+  await act(async () => { view.result.current.setInput('rewritten'); });
+  await act(async () => { view.result.current.cancelQueuedEdit(); });
 
-  assert.equal(view.result.current.queuedDraft, null);
-  await waitFor(() => assert.equal(queuedOnServer(), null));
+  assert.equal(view.result.current.input, '');
+  assert.equal(view.result.current.isEditingQueuedDraft, false);
+  await waitFor(() => assert.deepEqual(queuedContents(), ['follow-up A', 'follow-up B']));
+});
+
+test('deleting one queued turn leaves the others', async () => {
+  const { view } = render();
+  await submit(view, 'follow-up A');
+  await submit(view, 'follow-up B');
+
+  const firstId = view.result.current.queuedDrafts[0]?.id ?? '';
+  await act(async () => { view.result.current.deleteQueuedDraft(firstId); });
+
+  assert.deepEqual(view.result.current.queuedDrafts.map((draft) => draft.content), ['follow-up B']);
+  await waitFor(() => assert.deepEqual(queuedContents(), ['follow-up B']));
 });
 
 test('a message queued from another tab is kept and shown when this tab queues one', async () => {
   // Another tab (or this page before a reload) queued A; this page has not heard of it.
-  server.set('session-1', { text: '', queuedMessage: { content: 'from the other tab', attachments: [] } });
+  server.set('session-1', {
+    text: '',
+    queuedMessages: [{ id: 'other', content: 'from the other tab', attachments: [] }],
+  });
   const { view } = render();
 
   await submit(view, 'from this tab');
 
-  assert.equal(queuedOnServer()?.content, 'from the other tab\n\nfrom this tab');
-  assert.equal(view.result.current.queuedDraft?.content, 'from the other tab\n\nfrom this tab');
+  assert.deepEqual(queuedContents(), ['from the other tab', 'from this tab']);
+  assert.deepEqual(view.result.current.queuedDrafts.map((draft) => draft.content), ['from the other tab', 'from this tab']);
 });
 
 test('the card follows the server when another tab adds to the queued message', async () => {
   const { view } = render();
   await submit(view, 'follow-up A');
-  server.set('session-1', { text: '', queuedMessage: { content: 'follow-up A\n\nfrom the other tab', attachments: [] } });
+  server.set('session-1', {
+    text: '',
+    queuedMessages: [
+      { id: 'a', content: 'follow-up A', attachments: [] },
+      { id: 'other', content: 'from the other tab', attachments: [] },
+    ],
+  });
 
-  // The card re-reads the server every 5 s while it is shown.
+  // The rows re-read the server every 5 s while they are shown.
   await act(async () => { await new Promise((resolve) => setTimeout(resolve, 5_300)); });
 
-  assert.equal(view.result.current.queuedDraft?.content, 'follow-up A\n\nfrom the other tab');
+  assert.deepEqual(view.result.current.queuedDrafts.map((draft) => draft.content), ['follow-up A', 'from the other tab']);
 }, 10_000);
 
 test('a follow-up the server does not accept stays in the composer, with an error, and no card', async () => {
@@ -349,38 +393,21 @@ test('a follow-up the server does not accept stays in the composer, with an erro
   await submit(view, 'follow-up A');
 
   assert.equal(view.result.current.input, 'follow-up A', 'the message is kept for another try');
-  assert.equal(view.result.current.queuedDraft, null, 'no card for a message nothing will send');
+  assert.deepEqual(view.result.current.queuedDrafts, [], 'no row for a message nothing will send');
   assert.equal(errors.length, 1);
   assert.equal(errors[0]?.content, 'Failed to queue message: Internal server error', 'what the server said');
 });
 
-test('a slash command is not merged with a queued message: it stays in the composer, with an error', async () => {
+test('a slash command is queued as its own turn after the message already waiting', async () => {
   const { view, errors } = render();
   await submit(view, 'fix the failing test');
 
   await submit(view, '/compact');
 
-  assert.equal(queuedOnServer()?.content, 'fix the failing test', 'the queued text is not turned into /compact arguments');
-  assert.equal(view.result.current.queuedDraft?.content, 'fix the failing test');
-  assert.equal(view.result.current.input, '/compact', 'the command is kept to send on its own later');
-  assert.equal(errors.length, 1);
-  assert.equal(errors[0]?.content, 'Failed to queue message: A slash command runs as a turn of its own, so it cannot be combined with the queued message. Send it after the queued message has gone.');
-});
-
-test('the slash-command refusal is shown in the user\'s language', async () => {
-  await i18n.changeLanguage('de');
-  try {
-    const { view, errors } = render();
-    await submit(view, 'fix the failing test');
-
-    await submit(view, '/compact');
-
-    assert.equal(errors.length, 1);
-    assert.equal(errors[0]?.content, i18n.t('chat:input.queue.notCombinable'));
-    assert.match(String(errors[0]?.content), /^Nachricht konnte nicht in die Warteschlange gestellt werden/);
-  } finally {
-    await i18n.changeLanguage('en');
-  }
+  assert.deepEqual(queuedContents(), ['fix the failing test', '/compact']);
+  assert.deepEqual(view.result.current.queuedDrafts.map((draft) => draft.content), ['fix the failing test', '/compact']);
+  assert.equal(view.result.current.input, '');
+  assert.equal(errors.length, 0);
 });
 
 test('switching sessions during the upload still queues the follow-up behind the earlier one', async () => {
@@ -403,8 +430,8 @@ test('switching sessions during the upload still queues the follow-up behind the
     await pending;
   });
 
-  assert.equal(queuedOnServer('session-1')?.content, 'follow-up A\n\nfollow-up B');
-  assert.equal(view.result.current.queuedDraft, null, 'the session now open has no card of its own');
+  assert.deepEqual(queuedContents('session-1'), ['follow-up A', 'follow-up B']);
+  assert.deepEqual(view.result.current.queuedDrafts, [], 'the session now open has no rows of its own');
   assert.equal(readDraftText('session-1'), '', 'and going back will not offer B to be queued again');
 });
 
@@ -427,8 +454,8 @@ test('what the user types while a follow-up is being queued stays in the compose
 
   assert.equal(view.result.current.input, 'the next one, typed meanwhile');
   assert.equal(readDraftText('session-1'), 'the next one, typed meanwhile');
-  assert.equal(queuedOnServer()?.content, 'follow-up A');
-  assert.equal(view.result.current.queuedDraft?.content, 'follow-up A');
+  assert.deepEqual(queuedContents(), ['follow-up A']);
+  assert.equal(view.result.current.queuedDrafts[0]?.content, 'follow-up A');
 });
 
 test('a follow-up the server refuses goes back in front of what was typed meanwhile', async () => {
@@ -456,7 +483,7 @@ test('a follow-up the server refuses goes back in front of what was typed meanwh
 
   assert.equal(view.result.current.input, 'follow-up A\n\nmore');
   assert.deepEqual(view.result.current.attachedFiles.map((file) => file.name), ['a.txt', 'c.txt']);
-  assert.equal(view.result.current.queuedDraft, null);
+  assert.deepEqual(view.result.current.queuedDrafts, []);
   assert.equal(errors.length, 1);
 });
 
@@ -476,11 +503,11 @@ test('Enter pressed again while a follow-up is being queued neither sends it twi
     await Promise.all([first, again, next]);
   });
 
-  const queued = queuedOnServer()?.content;
+  const queued = queuedContents().join('|');
   const kept = view.result.current.input;
   assert.ok(
     (queued === 'follow-up A' && kept === 'follow-up B')
-      || (queued === 'follow-up A\n\nfollow-up B' && kept === ''),
+      || (queued === 'follow-up A|follow-up B' && kept === ''),
     `A is queued once and B is either queued after it or still in the composer (queued ${JSON.stringify(queued)}, composer ${JSON.stringify(kept)})`,
   );
 });
@@ -504,28 +531,26 @@ test('Enter pressed while a refused follow-up is still being answered keeps both
   assert.equal(view.result.current.input, 'follow-up A\n\nfollow-up B', 'B waits in the composer, behind A');
   assert.equal(appendRequestCount, 1, 'B is not sent while A is still being answered');
   assert.equal(errors.length, 1);
-  assert.equal(queuedOnServer(), null);
+  assert.deepEqual(queuedOnServer(), []);
 });
 
-test('Edit then Enter re-queues the merged message even when the clear reaches the server late', async () => {
+test('Enter while editing writes that turn back in place and does not send it', async () => {
   const { view } = render();
   await submit(view, 'follow-up A');
   await submit(view, 'follow-up B');
 
-  const clear = hold();
-  clearGate = clear.gate;
-  await act(async () => { view.result.current.editQueuedDraft(); });
-  assert.equal(view.result.current.input, 'follow-up A\n\nfollow-up B');
-  const pending = startSubmit(view);
-  // Give the re-queue every chance to overtake the clear.
-  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 50)); });
+  const firstId = view.result.current.queuedDrafts[0]?.id ?? '';
+  await act(async () => { view.result.current.editQueuedDraft(firstId); });
+  await act(async () => { view.result.current.setInput('follow-up A, revised'); });
   await act(async () => {
-    clear.release();
-    await pending;
+    await view.result.current.handleSubmit({ preventDefault: () => undefined } as never);
   });
 
-  assert.equal(queuedOnServer()?.content, 'follow-up A\n\nfollow-up B', 'queued once, and not cleared afterwards');
-  assert.equal(view.result.current.queuedDraft?.content, 'follow-up A\n\nfollow-up B');
+  assert.equal(view.result.current.input, '');
+  assert.equal(view.result.current.isEditingQueuedDraft, false);
+  assert.deepEqual(queuedContents(), ['follow-up A, revised', 'follow-up B']);
+  assert.equal(queuedOnServer()[0]?.id, firstId);
+  assert.deepEqual(view.result.current.queuedDrafts.map((draft) => draft.content), ['follow-up A, revised', 'follow-up B']);
 });
 
 test('Edit used while a follow-up is being queued takes back only the message it showed', async () => {
@@ -537,67 +562,56 @@ test('Edit used while a follow-up is being queued takes back only the message it
   await act(async () => { view.result.current.setInput('follow-up B'); });
   const pending = startSubmit(view);
   // The server has appended B, but this page has not heard back yet.
-  await waitFor(() => assert.equal(queuedOnServer()?.content, 'follow-up A\n\nfollow-up B'));
-  await act(async () => { view.result.current.editQueuedDraft(); });
+  await waitFor(() => assert.deepEqual(queuedContents(), ['follow-up A', 'follow-up B']));
+  const firstId = view.result.current.queuedDrafts[0]?.id ?? '';
+  await act(async () => { view.result.current.editQueuedDraft(firstId); });
   await act(async () => {
     response.release();
     await pending;
   });
 
-  assert.equal(view.result.current.input, 'follow-up A', 'A is back in the composer to edit');
-  await waitFor(() => assert.equal(queuedOnServer()?.content, 'follow-up B', 'and B is still queued'));
-  assert.equal(view.result.current.queuedDraft?.content, 'follow-up B');
+  assert.equal(view.result.current.input, 'follow-up A', 'A is in the composer to edit, and still queued');
+  await waitFor(() => assert.deepEqual(queuedContents(), ['follow-up A', 'follow-up B']));
+  assert.deepEqual(view.result.current.queuedDrafts.map((draft) => draft.content), ['follow-up A', 'follow-up B']);
 });
 
-test('Edit after the card caught up with another tab still brings back this tab\'s files', async () => {
+test('Edit after another tab queued its own turn still brings back this tab\'s files', async () => {
   const fileA = new File(['a'], 'a.txt', { type: 'text/plain' });
   const { view } = render();
   await submit(view, 'follow-up A', [fileA]);
+  const ownId = view.result.current.queuedDrafts[0]?.id ?? '';
   server.set('session-1', {
     text: '',
-    queuedMessage: {
-      content: 'follow-up A\n\nfrom the other tab',
-      attachments: [{ name: 'a.txt', path: '/uploads/a.txt' }],
-    },
+    queuedMessages: [
+      { id: ownId, content: 'follow-up A', attachments: [{ name: 'a.txt', path: '/uploads/a.txt' }] },
+      { id: 'other', content: 'from the other tab', attachments: [{ name: 'x.txt', path: '/uploads/x.txt' }] },
+    ],
   });
 
   await act(async () => { await new Promise((resolve) => setTimeout(resolve, 5_300)); });
-  assert.equal(view.result.current.queuedDraft?.content, 'follow-up A\n\nfrom the other tab');
-  await act(async () => { view.result.current.editQueuedDraft(); });
+  assert.deepEqual(view.result.current.queuedDrafts.map((draft) => draft.content), ['follow-up A', 'from the other tab']);
+  await act(async () => { view.result.current.editQueuedDraft(ownId); });
 
-  assert.equal(view.result.current.input, 'follow-up A\n\nfrom the other tab');
+  assert.equal(view.result.current.input, 'follow-up A');
   assert.deepEqual(view.result.current.attachedFiles.map((file) => file.name), ['a.txt']);
+  assert.deepEqual(view.result.current.queuedDrafts.map((draft) => draft.content), ['follow-up A', 'from the other tab']);
 }, 10_000);
 
-test('Edit after another tab added a file to the queued message still brings back this tab\'s files', async () => {
-  const fileA = new File(['a'], 'a.txt', { type: 'text/plain' });
-  const { view } = render();
-  await submit(view, 'follow-up A', [fileA]);
-  server.set('session-1', {
-    text: '',
-    queuedMessage: {
-      content: 'follow-up A\n\nfrom the other tab',
-      attachments: [{ name: 'a.txt', path: '/uploads/a.txt' }, { name: 'x.txt', path: '/uploads/x.txt' }],
-    },
-  });
-
-  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 5_300)); });
-  assert.equal(view.result.current.queuedDraft?.uploadedAttachments?.length, 2, 'the card shows both files');
-  await act(async () => { view.result.current.editQueuedDraft(); });
-
-  // x.txt was uploaded by the other tab, so this page has no browser file for it.
-  assert.deepEqual(view.result.current.attachedFiles.map((file) => file.name), ['a.txt']);
-}, 10_000);
-
-test('a tab that is shown again catches up with the queued message at once', async () => {
+test('a tab that is shown again catches up with the queue at once', async () => {
   const { view } = render();
   await submit(view, 'follow-up A');
-  server.set('session-1', { text: '', queuedMessage: { content: 'follow-up A\n\nfrom the other tab', attachments: [] } });
+  server.set('session-1', {
+    text: '',
+    queuedMessages: [
+      { id: 'a', content: 'follow-up A', attachments: [] },
+      { id: 'other', content: 'from the other tab', attachments: [] },
+    ],
+  });
 
   await act(async () => { document.dispatchEvent(new Event('visibilitychange')); });
 
   await waitFor(
-    () => assert.equal(view.result.current.queuedDraft?.content, 'follow-up A\n\nfrom the other tab'),
+    () => assert.deepEqual(view.result.current.queuedDrafts.map((draft) => draft.content), ['follow-up A', 'from the other tab']),
     { timeout: 1_000 },
   );
 });
@@ -609,12 +623,16 @@ test('files of a message already sent do not come back with a follow-up queued a
   await submit(view, 'follow-up A', [fileA]);
   // The dispatcher sent A; another tab then queued the same text again, without the file.
   dispatcherClaims('session-1');
-  server.set('session-1', { text: '', queuedMessage: { content: 'follow-up A', attachments: [] } });
+  server.set('session-1', {
+    text: '',
+    queuedMessages: [{ id: 'again', content: 'follow-up A', attachments: [] }],
+  });
 
   await submit(view, 'follow-up B', [fileB]);
 
-  assert.equal(view.result.current.queuedDraft?.content, 'follow-up A\n\nfollow-up B');
-  assert.deepEqual(view.result.current.queuedDraft?.attachments.map((file) => file.name), ['b.txt']);
+  assert.deepEqual(view.result.current.queuedDrafts.map((draft) => draft.content), ['follow-up A', 'follow-up B']);
+  assert.deepEqual(view.result.current.queuedDrafts[1]?.attachments.map((file) => file.name), ['b.txt']);
+  assert.deepEqual(view.result.current.queuedDrafts[0]?.attachments, []);
 });
 
 test('a refused follow-up goes back to the session it was typed in, after a switch during the upload', async () => {
@@ -696,6 +714,6 @@ test('a session switch during the upload keeps a draft that changed in the sessi
     await pending;
   });
 
-  assert.equal(queuedOnServer('session-1')?.content, 'follow-up B');
+  assert.deepEqual(queuedContents('session-1'), ['follow-up B']);
   assert.equal(readDraftText('session-1'), 'written on the laptop');
 });

@@ -1,5 +1,4 @@
 import type { TFunction } from 'i18next';
-import type { CSSProperties } from 'react';
 import type { NavigateFunction } from 'react-router-dom';
 
 //----------------- LLM PROVIDER MODEL CATALOG ------------
@@ -768,8 +767,10 @@ export type CommandModalPayload = {
   data: HelpCommandData | ModelCommandData | CostCommandData | StatusCommandData;
 };
 
-/** A composer message queued while its session is still busy, holding the text, the in-memory and already-uploaded attachments and the send options snapshotted at queue time so it can be auto-sent unchanged once the session goes idle. */
+/** One composer message waiting in the session queue, holding its id, text, in-memory and already-uploaded attachments, and the send options snapshotted at queue time so it can be sent unchanged once the session goes idle. */
 export type QueuedDraft = {
+  /** Matches the id stored with the queued turn, so this row can be steered, edited, or deleted on its own. */
+  id: string;
   content: string;
   /** Browser files retained while this composer stays mounted, for editing. */
   attachments: File[];
@@ -1290,6 +1291,13 @@ export type FolderSuggestion = {
   type?: string;
 };
 
+/** Cached children of one directory in the folder browser tree. `ready` is a finished listing; `loading` and `error` describe an in-flight or failed browse. */
+export type FolderDirectoryListing = {
+  status: 'loading' | 'ready' | 'error';
+  children: FolderSuggestion[];
+  errorMessage?: string;
+};
+
 /** A stored GitHub token credential as returned by the credentials endpoint, listed so the user can pick which token authenticates a clone. */
 export type GithubTokenCredential = {
   id: number;
@@ -1378,26 +1386,6 @@ export type ProviderCliUpdateResult = {
 
 // ---------------------------
 
-//----------------- QUICK SETTINGS PANEL ------------
-
-/** Identifier of a boolean user preference exposed in the quick settings panel; use it as the key when reading or writing one preference. */
-export type PreferenceToggleKey =
-  | 'showRawParameters'
-  | 'showThinking'
-  | 'sendByCtrlEnter'
-  | 'voiceEnabled';
-
-/** The full set of quick settings booleans keyed by PreferenceToggleKey, held together so the panel can read every toggle from one object. */
-export type QuickSettingsPreferences = Record<PreferenceToggleKey, boolean>;
-
-/** Which content area the quick settings panel is showing: 'settings' (preference toggles) or 'commands' (slash-command list); persisted with the pin state and used by the tab bar and the panel view. */
-export type QuickSettingsTab = 'settings' | 'commands';
-
-/** Inline style for the quick settings drag handle, produced by the drag hook from the stored handle position and applied by the handle component. */
-export type QuickSettingsHandleStyle = CSSProperties;
-
-// ---------------------------
-
 //----------------- SETTINGS ------------
 
 /** The per-provider agent context the agents settings tab builds once and hands to each of its sections. */
@@ -1410,7 +1398,7 @@ export type AgentContext = {
 };
 
 /** Identifier of a top-level section in the settings dialog; use it whenever a tab is stored, compared or requested so deep links, the sidebar and the command palette all agree on the same set of names. */
-export type SettingsMainTab = 'agents' | 'appearance' | 'git' | 'api' | 'voice' | 'tasks' | 'browser' | 'notifications' | 'plugins' | 'about';
+export type SettingsMainTab = 'agents' | 'appearance' | 'commands' | 'git' | 'api' | 'voice' | 'tasks' | 'browser' | 'notifications' | 'plugins' | 'about';
 
 /** The coding-agent CLI a settings screen is configuring, aliasing LLMProvider so agent-scoped settings read as being about an agent rather than a chat model. */
 export type AgentProvider = LLMProvider;

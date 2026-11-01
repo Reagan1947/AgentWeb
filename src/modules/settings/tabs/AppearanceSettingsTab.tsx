@@ -19,7 +19,7 @@ type AppearanceSettingsTabProps = {
   onCodeEditorFontSizeChange: (value: string) => void;
 };
 
-/** Rendered by Settings for the "appearance" tab, covering theme, project sorting and code editor preferences. */
+/** Rendered by Settings for the "appearance" tab, covering theme, language, chat display, input, project sorting and code editor preferences. */
 export default function AppearanceSettingsTab({
   projectSortOrder,
   onProjectSortOrderChange,
@@ -59,6 +59,40 @@ export default function AppearanceSettingsTab({
       <SettingsSection title={t('mainTabs.appearance')}>
         <SettingsCard>
           <LanguageSelector />
+        </SettingsCard>
+      </SettingsSection>
+
+      <SettingsSection title={t('quickSettings.sections.toolDisplay')}>
+        <SettingsCard divided>
+          <SettingsRow label={t('quickSettings.showRawParameters')}>
+            <SettingsToggle
+              checked={preferences.showRawParameters}
+              onChange={(value) => setPreference('showRawParameters', value)}
+              ariaLabel={t('quickSettings.showRawParameters')}
+            />
+          </SettingsRow>
+          <SettingsRow label={t('quickSettings.showThinking')}>
+            <SettingsToggle
+              checked={preferences.showThinking}
+              onChange={(value) => setPreference('showThinking', value)}
+              ariaLabel={t('quickSettings.showThinking')}
+            />
+          </SettingsRow>
+        </SettingsCard>
+      </SettingsSection>
+
+      <SettingsSection title={t('quickSettings.sections.inputSettings')}>
+        <SettingsCard>
+          <SettingsRow
+            label={t('quickSettings.sendByCtrlEnter')}
+            description={t('quickSettings.sendByCtrlEnterDescription')}
+          >
+            <SettingsToggle
+              checked={preferences.sendByCtrlEnter}
+              onChange={(value) => setPreference('sendByCtrlEnter', value)}
+              ariaLabel={t('quickSettings.sendByCtrlEnter')}
+            />
+          </SettingsRow>
         </SettingsCard>
       </SettingsSection>
 

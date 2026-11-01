@@ -21,7 +21,7 @@ type CollapsibleProps = {
   onOpenChange?: (open: boolean) => void;
 } & React.HTMLAttributes<HTMLDivElement>;
 
-/** Used by the chat module for collapsible tool output, by the shared Reasoning primitive, and by the sidebar to expand a project’s sessions. */
+/** Used by the chat module for collapsible tool output, by the shared Reasoning primitive, by the sidebar to expand a project’s sessions, and by the folder browser tree. */
 export const Collapsible = React.forwardRef<HTMLDivElement, CollapsibleProps>(
   ({ defaultOpen = false, open: controlledOpen, onOpenChange: controlledOnOpenChange, className, children, ...props }, ref) => {
     const [internalOpen, setInternalOpen] = React.useState(defaultOpen);
@@ -48,7 +48,7 @@ export const Collapsible = React.forwardRef<HTMLDivElement, CollapsibleProps>(
 );
 Collapsible.displayName = 'Collapsible';
 
-/** Toggle slot of Collapsible, used by the chat module, the shared Reasoning primitive, and the sidebar project row. */
+/** Toggle slot of Collapsible, used by the chat module, the shared Reasoning primitive, the sidebar project row, and the folder browser tree. */
 export const CollapsibleTrigger = React.forwardRef<HTMLButtonElement, React.ButtonHTMLAttributes<HTMLButtonElement>>(
   ({ onClick, children, className, ...props }, ref) => {
     const { open, onOpenChange } = useCollapsible();
@@ -78,7 +78,7 @@ export const CollapsibleTrigger = React.forwardRef<HTMLButtonElement, React.Butt
 );
 CollapsibleTrigger.displayName = 'CollapsibleTrigger';
 
-/** Body slot of Collapsible, used by the chat module, the shared Reasoning primitive, and the sidebar project row. */
+/** Body slot of Collapsible, used by the chat module, the shared Reasoning primitive, the sidebar project row, and the folder browser tree. */
 export const CollapsibleContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
   ({ className, children, ...props }, ref) => {
     const { open } = useCollapsible();

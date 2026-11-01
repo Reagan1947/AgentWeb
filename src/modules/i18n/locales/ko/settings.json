@@ -126,6 +126,7 @@
     "label": "설정",
     "agents": "에이전트",
     "appearance": "외관",
+    "commands": "명령어",
     "git": "Git",
     "apiTokens": "API & 토큰",
     "voice": "음성",
@@ -358,6 +359,9 @@
     }
   },
   "agents": {
+    "list": {
+      "description": "에이전트를 선택해 계정, 권한, 도구를 관리합니다."
+    },
     "authStatus": {
       "checking": "확인 중...",
       "connected": "연결됨",

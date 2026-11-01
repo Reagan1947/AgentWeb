@@ -148,6 +148,29 @@ function readRequiredSessionId(data: AnyRecord): string | null {
  * provider-native id all come from the database — never from the client),
  * registers the run, and dispatches to the provider runtime.
  */
+/**
+ * Stops the run a Steer message is about to replace.
+ *
+ * The registry must drop that run before the new one starts, or the new turn
+ * is refused as already in progress. No active run is not an error: Steer is
+ * also how a queued message goes out the moment the session is idle.
+ */
+async function interruptRunningTurn(
+  sessionId: string,
+  dependencies: ChatWebSocketDependencies,
+): Promise<void> {
+  const activeRun = chatRunRegistry.getRun(sessionId);
+  if (!activeRun || activeRun.status !== 'running') {
+    return;
+  }
+
+  const aborted = await dependencies.runtime.abort(activeRun.provider, sessionId);
+  chatRunRegistry.completeRun(sessionId, {
+    exitCode: aborted ? 0 : 1,
+    aborted: true,
+  });
+}
+
 async function handleChatSend(
   ws: WebSocket,
   userId: string | number | null,
@@ -157,6 +180,11 @@ async function handleChatSend(
   const resolved = resolveSendTarget(ws, data, dependencies, 'chat.send');
   if (!resolved) {
     return;
+  }
+
+  // Steer sends this message now, in place of the turn that is still going.
+  if (data.interrupt === true) {
+    await interruptRunningTurn(resolved.sessionId, dependencies);
   }
 
   await dispatchRun(ws, userId, resolved.sessionId, resolved.session, data, dependencies);

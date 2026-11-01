@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 
-import type { AgentCategory, AgentContextByProvider, AgentProvider, AgentSettingsProject, ClaudePermissionsState, CodexPermissionMode, CursorPermissionsState, ProviderAuthStatus } from '@/shared/types';
-import AgentCategoryContentSection from '@/modules/settings/tabs/agents-settings/sections/AgentCategoryContentSection';
-import AgentCategoryTabsSection from '@/modules/settings/tabs/agents-settings/sections/AgentCategoryTabsSection';
-import AgentSelectorSection from '@/modules/settings/tabs/agents-settings/sections/AgentSelectorSection';
+import AgentSettingsLayer from '@/modules/settings/tabs/agents-settings/AgentSettingsLayer';
+import AgentListSection from '@/modules/settings/tabs/agents-settings/sections/AgentListSection';
+import { ScrollArea } from '@/shared/ui';
+import type { AgentContextByProvider, AgentProvider, AgentSettingsProject, ClaudePermissionsState, CodexPermissionMode, CursorPermissionsState, ProviderAuthStatus } from '@/shared/types';
 
 type ProviderAuthStatusByProvider = Record<AgentProvider, ProviderAuthStatus>;
 
@@ -19,7 +19,9 @@ type AgentsSettingsTabProps = {
   projects: AgentSettingsProject[];
 };
 
-/** Rendered by Settings for the "agents" tab, hosting per-provider account, permission, MCP and skill settings. */
+const AGENT_PROVIDERS: AgentProvider[] = ['claude', 'cursor', 'codex', 'opencode'];
+
+/** Rendered by Settings for the "agents" tab, listing providers and opening one provider's settings layer. */
 export default function AgentsSettingsTab({
   providerAuthStatus,
   onProviderLogin,
@@ -31,17 +33,8 @@ export default function AgentsSettingsTab({
   onCodexPermissionModeChange,
   projects,
 }: AgentsSettingsTabProps) {
-  const [selectedAgent, setSelectedAgent] = useState<AgentProvider>('claude');
-  const [selectedCategory, setSelectedCategory] = useState<AgentCategory>('account');
-  const visibleCategories = useMemo<AgentCategory[]>(() => (
-    selectedAgent === 'opencode'
-      ? ['account', 'permissions', 'mcp']
-      : ['account', 'permissions', 'mcp', 'skills']
-  ), [selectedAgent]);
-
-  const visibleAgents = useMemo<AgentProvider[]>(() => {
-    return ['claude', 'cursor', 'codex', 'opencode'];
-  }, []);
+  // Which provider's settings layer is open. Null leaves the list as the whole tab.
+  const [openAgent, setOpenAgent] = useState<AgentProvider | null>(null);
 
   const agentContextById = useMemo<AgentContextByProvider>(() => ({
     claude: {
@@ -68,33 +61,24 @@ export default function AgentsSettingsTab({
     providerAuthStatus.opencode,
   ]);
 
-  useEffect(() => {
-    if (!visibleCategories.includes(selectedCategory)) {
-      setSelectedCategory(visibleCategories[0] ?? 'account');
-    }
-  }, [selectedCategory, visibleCategories]);
-
   return (
-    <div className="-mx-4 -mb-4 -mt-2 flex min-h-[300px] min-w-0 flex-col overflow-hidden md:-mx-6 md:-mb-6 md:-mt-2 md:min-h-[500px]">
-      <AgentSelectorSection
-        agents={visibleAgents}
-        selectedAgent={selectedAgent}
-        onSelectAgent={setSelectedAgent}
-        agentContextById={agentContextById}
-      />
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <ScrollArea overlayScrollbar className="min-h-0 flex-1">
+        <div className="-mr-3 min-w-0 p-4 pb-safe-area-inset-bottom md:p-6">
+          <AgentListSection
+            agents={AGENT_PROVIDERS}
+            agentContextById={agentContextById}
+            onOpenAgent={setOpenAgent}
+          />
+        </div>
+      </ScrollArea>
 
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <AgentCategoryTabsSection
-          categories={visibleCategories}
-          selectedAgent={selectedAgent}
-          selectedCategory={selectedCategory}
-          onSelectCategory={setSelectedCategory}
-        />
-
-        <AgentCategoryContentSection
-          selectedAgent={selectedAgent}
-          selectedCategory={selectedCategory}
+      {openAgent && (
+        <AgentSettingsLayer
+          key={openAgent}
+          agent={openAgent}
           agentContextById={agentContextById}
+          onClose={() => setOpenAgent(null)}
           claudePermissions={claudePermissions}
           onClaudePermissionsChange={onClaudePermissionsChange}
           cursorPermissions={cursorPermissions}
@@ -103,7 +87,7 @@ export default function AgentsSettingsTab({
           onCodexPermissionModeChange={onCodexPermissionModeChange}
           projects={projects}
         />
-      </div>
+      )}
     </div>
   );
 }

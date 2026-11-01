@@ -104,7 +104,7 @@ export function ImageLightbox({ src, alt, onClose }: { src: string; alt: string;
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm"
+      className="modal-backdrop fixed inset-0 z-[100] flex items-center justify-center"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
@@ -114,7 +114,7 @@ export function ImageLightbox({ src, alt, onClose }: { src: string; alt: string;
         type="button"
         onClick={onClose}
         aria-label={t('chat:misc.closeImagePreview')}
-        className="absolute right-4 top-4 rounded-full bg-white/10 p-2 text-white transition-colors hover:bg-white/20"
+        className="absolute right-4 top-4 rounded-full bg-black/70 p-2 text-white transition-colors hover:bg-black/80"
       >
         <X className="h-5 w-5" />
       </button>

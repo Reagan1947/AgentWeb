@@ -218,7 +218,8 @@ CREATE TABLE IF NOT EXISTS user_preferences (
  * Unsent composer text and queued messages, per user and per chat scope.
  *
  * `draft_scope` is a session id, or `project:<projectId>` for a chat that has
- * not been sent yet and therefore has no session. Storing this server-side is
+ * not been sent yet and therefore has no session. `queued_message` is a JSON
+ * array of turns waiting to be sent, oldest first. Storing this server-side is
  * what lets a message typed on a laptop be finished on a phone.
  */
 export const SESSION_DRAFTS_TABLE_SCHEMA_SQL = `

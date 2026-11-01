@@ -151,7 +151,7 @@ function ProjectSidebarRegion({
       }`}
     >
       <button
-        className="fixed inset-0 bg-background/60 backdrop-blur-sm transition-opacity duration-150 ease-out"
+        className="modal-backdrop fixed inset-0 transition-opacity duration-150 ease-out"
         onClick={handleBackdropClick}
         onTouchStart={handleBackdropTouch}
         aria-label={t('versionUpdate.ariaLabels.closeSidebar')}

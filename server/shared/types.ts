@@ -975,18 +975,20 @@ export type CreateCredentialResult = {
 // ---------------------------
 //----------------- CHAT DRAFT QUEUE TYPES ------------
 /**
- * A chat message queued to be sent when its session is next idle, in the shape
- * the composer submits it and `session_drafts.queued_message` stores it.
+ * One chat message waiting to be sent when its session is next idle.
  *
- * `content` is the message text, `attachments` the JSON-safe descriptors
- * returned by POST /api/assets/files, and `options` the composer's send options
- * (model, effort, permission mode, ...) captured when it was queued. A session
- * has at most one: a message queued while another is waiting is merged into it
- * by the drafts repository. The User module accepts it, the Database module
- * stores and merges it, and the Scheduled Messages dispatcher sends it (read
+ * A session keeps an ordered list of these in `session_drafts.queued_message`.
+ * Each entry is its own turn: a message queued while others are waiting is
+ * added after them, never joined into their text. `id` identifies that entry
+ * so the composer can remove, edit, or steer it. `content` is the message
+ * text, `attachments` the JSON-safe descriptors returned by POST
+ * /api/assets/files, and `options` the composer's send options captured when
+ * it was queued. The User module accepts it, the Database module stores the
+ * list, and the Scheduled Messages dispatcher sends the first entry (read
  * through `readQueuedChatMessage`).
  */
 export type QueuedChatMessage = {
+  id?: string;
   content: string;
   options?: Record<string, unknown>;
   attachments: unknown[];

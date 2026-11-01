@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 
 import { render, screen } from '@testing-library/react';
 import React from 'react';
-import { test, vi } from 'vitest';
+import { test } from 'vitest';
 
 import '@/modules/i18n';
 import ActivityIndicator from '@/modules/chat/composer/ActivityIndicator';
@@ -12,8 +12,8 @@ import type { BackgroundTaskSummary, SessionActivity } from '@/shared/types';
  * The pill above the composer used to vanish at the turn's `complete` even
  * when the CLI stayed open for the agents, workflows or commands the turn
  * launched. A background-only entry now keeps it up, named for the work and
- * in the purple of the workflow and agent cards — with no Stop, because
- * nothing is responding and the composer can send.
+ * in the purple of the workflow and agent cards. Nothing is responding, and
+ * the composer can send.
  */
 
 const task = (overrides: Partial<BackgroundTaskSummary> = {}): BackgroundTaskSummary => ({
@@ -34,9 +34,8 @@ const backgroundActivity = (tasks: BackgroundTaskSummary[]): SessionActivity => 
   tasks,
 });
 
-test('a background-only session names its workflow, counts from its start and offers no Stop', () => {
-  const onAbort = vi.fn();
-  const { container } = render(<ActivityIndicator activity={backgroundActivity([task()])} onAbort={onAbort} />);
+test('a background-only session names its workflow and counts from its start', () => {
+  const { container } = render(<ActivityIndicator activity={backgroundActivity([task()])} />);
 
   assert.match(container.textContent ?? '', /Background work…/);
   assert.match(container.textContent ?? '', /Workflow frontend-architecture-audit/);
@@ -73,15 +72,17 @@ test('an agent and a command are named by what they were asked to do; several ta
   assert.doesNotMatch(nested.container.textContent ?? '', /2 tasks/);
 });
 
-test('a response in flight still shows the Stop button and the primary dot', () => {
+test('a response in flight shows the primary dot and no Stop button', () => {
   const { container } = render(
     <ActivityIndicator
       activity={{ statusText: 'Thinking', canInterrupt: true, startedAt: Date.now() }}
-      onAbort={() => {}}
     />,
   );
 
-  assert.ok(screen.getByRole('button', { name: 'Stop' }));
+  const chip = screen.getByRole('status');
+  assert.equal(screen.queryByRole('button', { name: 'Stop' }), null);
+  assert.match(chip.className, /rounded-lg/);
+  assert.doesNotMatch(chip.className, /rounded-b-none|border-b-0/);
   assert.ok(container.querySelector('.bg-primary'));
   assert.equal(container.querySelector('.bg-purple-500'), null);
 });

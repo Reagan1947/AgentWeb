@@ -1,7 +1,7 @@
 import { useCallback, useState, useEffect, useRef } from 'react';
 import type { ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AlertTriangle, Check, X, Loader2, Folder, Upload } from 'lucide-react';
+import { AlertTriangle, Check, X, Loader2, Upload } from 'lucide-react';
 
 import { cn } from '@/shared/utils';
 import { ICON_SIZE_CLASS, getFileIconData } from '@/modules/file-tree/utils/fileIcons';
@@ -14,7 +14,7 @@ import { useFileTreeUpload } from '@/modules/file-tree/hooks/useFileTreeUpload';
 import type { DirectoryRevealRequest, FileTreeImageSelection, FileTreeNode,Project } from '@/shared/types';
 import { formatFileSize, formatRelativeTime, isImageFile } from '@/modules/file-tree/utils/fileTreeUtils';
 import { directoryRevealPaths } from '@/modules/file-tree/utils/revealDirectory';
-import { ScrollArea, Input } from '@/shared/ui';
+import { FolderBoldIcon, Input, ScrollArea } from '@/shared/ui';
 import FileTreeBody from '@/modules/file-tree/FileTreeBody';
 import FileTreeDetailedColumns from '@/modules/file-tree/FileTreeDetailedColumns';
 import FileTreeHeader from '@/modules/file-tree/FileTreeHeader';
@@ -233,11 +233,11 @@ export default function FileTree({ selectedProject, onFileOpen, revealDirectory 
         {/* New item input */}
         {operations.isCreating && (
           <div
-            className="mb-1 flex items-center gap-1.5 py-[3px] pr-2"
+            className="mb-1 flex items-center gap-1.5 py-1.5 pr-2"
             style={{ paddingLeft: `${(operations.newItemParent.split('/').length - 1) * 16 + 4}px` }}
           >
             {operations.newItemType === 'directory' ? (
-              <Folder className={cn(ICON_SIZE_CLASS, 'text-blue-500')} />
+              <FolderBoldIcon className={cn(ICON_SIZE_CLASS, 'text-muted-foreground')} />
             ) : (
               <span className="ml-[18px]">{renderFileIcon(operations.newItemName)}</span>
             )}
@@ -303,7 +303,7 @@ export default function FileTree({ selectedProject, onFileOpen, revealDirectory 
 
       {/* Delete Confirmation Dialog */}
       {operations.deleteConfirmation.isOpen && operations.deleteConfirmation.item && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50">
+        <div className="modal-backdrop fixed inset-0 z-[9999] flex items-center justify-center">
           <div className="mx-4 max-w-sm rounded-lg border border-border bg-background p-4 shadow-lg">
             <div className="mb-4 flex items-center gap-3">
               <div className="rounded-full bg-red-100 p-2 dark:bg-red-900/30">

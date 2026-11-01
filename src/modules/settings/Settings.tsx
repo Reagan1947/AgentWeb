@@ -3,10 +3,11 @@ import { X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { ProviderLoginModal } from '@/modules/provider-auth';
-import { Button } from '@/shared/ui';
+import { Button, ScrollArea } from '@/shared/ui';
 import SettingsSidebar from '@/modules/settings/SettingsSidebar';
 import AgentsSettingsTab from '@/modules/settings/tabs/agents-settings/AgentsSettingsTab';
 import AppearanceSettingsTab from '@/modules/settings/tabs/AppearanceSettingsTab';
+import CommandsSettingsTab from '@/modules/settings/tabs/CommandsSettingsTab';
 import CredentialsSettingsTab from '@/modules/settings/tabs/api-settings/CredentialsSettingsTab';
 import VoiceSettingsTab from '@/modules/settings/tabs/VoiceSettingsTab';
 import GitSettingsTab from '@/modules/settings/tabs/git-settings/GitSettingsTab';
@@ -17,13 +18,15 @@ import { PluginSettingsTab } from '@/modules/plugins';
 import AboutTab from '@/modules/settings/tabs/AboutTab';
 import { useSettingsController } from '@/modules/settings/hooks/useSettingsController';
 import { useWebPush } from '@/modules/settings/hooks/useWebPush';
-import type { AgentSettingsProject } from '@/shared/types';
+import type { AgentSettingsProject, Project } from '@/shared/types';
 
 type SettingsProps = {
   isOpen: boolean;
   onClose: () => void;
   projects?: AgentSettingsProject[];
   initialTab?: string;
+  // The project whose slash commands the Commands tab lists and inserts.
+  selectedProject?: Project | null;
 };
 
 type DesktopNotificationsState = {
@@ -35,7 +38,13 @@ type DesktopNotificationsState = {
 };
 
 /** Exported as the settings module's public entry point and rendered by the sidebar module as its settings dialog. */
-function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }: SettingsProps) {
+function Settings({
+  isOpen,
+  onClose,
+  projects = [],
+  initialTab = 'agents',
+  selectedProject = null,
+}: SettingsProps) {
   const { t } = useTranslation('settings');
   const desktopNotificationsBridge = useMemo(() => (
     typeof window === 'undefined'
@@ -184,7 +193,7 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }: Set
 
   return (
     <div
-      className="modal-backdrop fixed inset-0 z-[9999] flex items-center justify-center bg-background/80 backdrop-blur-sm md:p-4"
+      className="modal-backdrop fixed inset-0 z-[9999] flex items-center justify-center md:p-4"
       onMouseDown={handleBackdropMouseDown}
       onClick={handleBackdropClick}
     >
@@ -217,9 +226,30 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }: Set
         <div className="flex min-h-0 min-w-0 flex-1 flex-col md:flex-row">
           <SettingsSidebar activeTab={activeTab} onChange={setActiveTab} />
 
-          {/* Content */}
-          <main className="min-w-0 flex-1 overflow-y-auto overflow-x-hidden">
-            <div key={activeTab} className="settings-content-enter min-w-0 space-y-6 overflow-x-hidden p-4 pb-safe-area-inset-bottom md:space-y-8 md:p-6">
+          {/* Agents fills this pane with the provider list. Opening one agent covers this dialog with its own settings layer. */}
+          <main className="flex min-h-0 min-w-0 flex-1 flex-col">
+            {activeTab === 'agents' ? (
+              <div key="agents" className="settings-content-enter flex min-h-0 min-w-0 flex-1 flex-col">
+                <AgentsSettingsTab
+                  providerAuthStatus={providerAuthStatus}
+                  onProviderLogin={openLoginForProvider}
+                  claudePermissions={claudePermissions}
+                  onClaudePermissionsChange={setClaudePermissions}
+                  cursorPermissions={cursorPermissions}
+                  onCursorPermissionsChange={setCursorPermissions}
+                  codexPermissionMode={codexPermissionMode}
+                  onCodexPermissionModeChange={setCodexPermissionMode}
+                  projects={projects}
+                />
+              </div>
+            ) : (
+            <ScrollArea overlayScrollbar className="min-h-0 flex-1">
+            {/* The overlay thumb does not take width; -mr-3 cancels its gutter so the thumb sits in this pane's padding. */}
+            <div key={activeTab} className="settings-content-enter -mr-3 min-w-0 space-y-6 overflow-x-hidden p-4 pb-safe-area-inset-bottom md:space-y-8 md:p-6">
+              {activeTab === 'commands' && (
+                <CommandsSettingsTab selectedProject={selectedProject} onClose={onClose} />
+              )}
+
               {activeTab === 'appearance' && (
                 <AppearanceSettingsTab
                   projectSortOrder={projectSortOrder}
@@ -233,20 +263,6 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }: Set
               )}
 
               {activeTab === 'git' && <GitSettingsTab />}
-
-              {activeTab === 'agents' && (
-                <AgentsSettingsTab
-                  providerAuthStatus={providerAuthStatus}
-                  onProviderLogin={openLoginForProvider}
-                  claudePermissions={claudePermissions}
-                  onClaudePermissionsChange={setClaudePermissions}
-                  cursorPermissions={cursorPermissions}
-                  onCursorPermissionsChange={setCursorPermissions}
-                  codexPermissionMode={codexPermissionMode}
-                  onCodexPermissionModeChange={setCodexPermissionMode}
-                  projects={projects}
-                />
-              )}
 
               {activeTab === 'tasks' && <TasksSettingsTab />}
 
@@ -276,6 +292,8 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }: Set
 
               {activeTab === 'about' && <AboutTab />}
             </div>
+            </ScrollArea>
+            )}
           </main>
         </div>
       </div>

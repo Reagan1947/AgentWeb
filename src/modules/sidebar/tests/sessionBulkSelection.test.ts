@@ -485,13 +485,15 @@ test('the project row starts a session and toggles its favorite from the trailin
   const favorite = buttonByLabel(container, 'tooltips.removeFromFavorites');
   assert.equal(favorite?.className.includes('hidden'), false, 'the yellow star stays on a starred row');
   assert.equal(favorite?.className.includes('text-yellow-600'), true);
+  assert.equal(favorite?.className.includes('hover:bg-accent'), true, 'a starred star keeps the same hover fill');
+  assert.equal(favorite?.className.includes('hover:bg-yellow-50'), false, 'starring does not turn the star hover yellow');
   const row = container.querySelector('button[aria-expanded]')?.parentElement;
   assert.ok(row);
   assert.equal(row.className.includes('bg-background'), true, 'starring keeps the project background');
   const hover = row.querySelector('.absolute.rounded-md');
   assert.equal(hover?.className.includes('rounded-md'), true, 'the project hover uses the session row radius');
   assert.equal(hover?.className.includes('group-hover:bg-accent'), true, 'starring keeps the project hover color');
-  assert.equal(hover?.className.includes('group-hover:bg-accent/50'), false, 'project hover matches the selected fill');
+  assert.equal(hover?.className.includes('group-hover:bg-accent/50'), false, 'project hover stays the full accent fill');
   assert.equal(hover?.className.includes('-z-10'), true, 'the hover fill stays behind the project name');
   assert.equal(row.className.includes('isolate'), true, 'the row keeps the hover fill inside its own layer');
   assert.equal(row.className.includes('bg-yellow-50/50'), false);

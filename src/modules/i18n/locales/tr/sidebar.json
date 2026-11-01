@@ -20,7 +20,7 @@
     "runClaudeCli": "Başlamak için bir proje dizininde Claude CLI çalıştır"
   },
   "app": {
-    "title": "CloudCLI",
+    "title": "AgentWeb",
     "subtitle": "AI kodlama asistanı arayüzü"
   },
   "sessions": {
@@ -33,7 +33,7 @@
     "unnamed": "Adsız",
     "loading": "Yükleniyor...",
     "showMore": "Daha fazla oturum göster",
-    "select": "Seç",
+    "select": "Oturumu yönet",
     "selectAll": "Tümünü seç",
     "selectAllLoaded": "Yüklenenleri seç",
     "clearSelection": "Seçimi kaldır",
@@ -74,7 +74,6 @@
     "save": "Kaydet",
     "delete": "Sil",
     "rename": "Yeniden Adlandır",
-    "joinCommunity": "Topluluğa Katıl",
     "reportIssue": "Sorun Bildir",
     "starOnGithub": "GitHub'da Yıldızla"
   },

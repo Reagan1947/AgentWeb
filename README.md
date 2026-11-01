@@ -1,7 +1,7 @@
 <div align="center">
  <img src="public/agentweb-icon.png" alt="AgentWeb" width="128" height="128">
  <h1>AgentWeb</h1>
- <p>A desktop and mobile UI for <a href="https://docs.anthropic.com/en/docs/claude-code">Claude Code</a>, <a href="https://docs.cursor.com/en/cli/overview">Cursor CLI</a>, and <a href="https://developers.openai.com/codex">Codex</a>.<br>Use it locally or remotely to view your active projects and sessions from everywhere.</p>
+ <p>A desktop and mobile UI for <a href="https://docs.anthropic.com/en/docs/claude-code">Claude Code</a>, <a href="https://docs.cursor.com/en/cli/overview">Cursor CLI</a>, and <a href="https://developers.openai.com/codex">Codex</a>.<br>Built on <a href="https://github.com/siteboon/claudecodeui">CloudCLI UI</a>, with the interactive interface refined for day-to-day agent work. Use it locally or remotely to view your active projects and sessions from everywhere.</p>
 </div>
 
 <p align="center">
@@ -19,36 +19,21 @@
 
 ---
 
+## About
+
+AgentWeb is based on [CloudCLI UI](https://github.com/siteboon/claudecodeui) (also known as Claude Code UI). It keeps that project's workspace for Claude Code, Cursor CLI, and Codex, and continues from there with optimizations to the interactive interface — how conversations, navigation, and the surrounding workspace respond while you work with an agent.
+
+The sections below describe the CloudCLI UI foundation this project builds on, including self-hosting, CloudCLI Cloud, and the original feature set.
+
+---
+
 ## Screenshots
 
 <div align="center">
 
-<table>
-<tr>
-<td align="center">
-<h3>Desktop View</h3>
-<img src="public/screenshots/desktop-main.png" alt="Desktop Interface" width="400">
+<img src="public/screenshots/agentweb-main.png" alt="AgentWeb main interface" width="800">
 <br>
-<em>Main interface showing project overview and chat</em>
-</td>
-<td align="center">
-<h3>Mobile Experience</h3>
-<img src="public/screenshots/mobile-chat.png" alt="Mobile Interface" width="250">
-<br>
-<em>Responsive mobile design with touch navigation</em>
-</td>
-</tr>
-<tr>
-<td align="center" colspan="2">
-<h3>CLI Selection</h3>
-<img src="public/screenshots/cli-selection.png" alt="CLI Selection" width="400">
-<br>
-<em>Select between Claude Code, Cursor CLI and Codex</em>
-</td>
-</tr>
-</table>
-
-
+<em>Project list and chat, with the refined AgentWeb interface</em>
 
 </div>
 
@@ -256,6 +241,10 @@ This project is open source and free to use, modify, and distribute under the AG
 CloudCLI UI - (https://cloudcli.ai).
 
 ## Acknowledgments
+
+### Based on
+
+- **[CloudCLI UI](https://github.com/siteboon/claudecodeui)** — the upstream project. AgentWeb builds on that codebase and adds interactive-interface refinements.
 
 ### Built With
 - **[Claude Code](https://docs.anthropic.com/en/docs/claude-code)** - Anthropic's official CLI

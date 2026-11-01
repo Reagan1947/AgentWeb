@@ -341,6 +341,24 @@
     transition: opacity 200ms ease-in-out,
                 transform 200ms cubic-bezier(0.4, 0, 0.2, 1);
   }
+
+  /* One scrim for every popup: 50% black plus a 4px blur.
+     Dialog, alerts, sheets, and feature modals share this class so the mask
+     does not drift. `.modal-backdrop-md` is the same scrim from the md
+     breakpoint up; phone-sized editors fill the screen and stay solid. */
+  .modal-backdrop {
+    background-color: rgb(0 0 0 / 0.5);
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+  }
+
+  @media (min-width: 768px) {
+    .modal-backdrop-md {
+      background-color: rgb(0 0 0 / 0.5);
+      -webkit-backdrop-filter: blur(4px);
+      backdrop-filter: blur(4px);
+    }
+  }
   
   /* Chat message transitions */
   .message-transition {
@@ -597,7 +615,23 @@
 /* Mobile optimizations and components */
 @layer components {
   .chat-messages-pane {
-    contain: layout style paint;
+    /* Paint containment on the scrollport drops WebKit's composited scroll
+       layer whenever a row changes size, so a mobile drag hitches and jumps.
+       Layout and style containment still isolate the transcript. */
+    contain: layout style;
+  }
+
+  /* The sticky export bar must not become a scroll anchor. When it sticks,
+     WebKit otherwise shifts the transcript under the finger. */
+  .chat-messages-pane .sticky {
+    overflow-anchor: none;
+  }
+
+  /* `transition: all` on buttons and links animates height. A row that grows
+     while the finger is down (an image decoding, a block finishing layout)
+     then eases for 150ms and the scroll position chases it. */
+  .chat-messages-pane :is(button, a, [role='button']) {
+    transition-property: color, background-color, border-color, outline-color, text-decoration-color, opacity, box-shadow, filter, transform;
   }
 
   .chat-composer-shell {
@@ -616,24 +650,12 @@
     will-change: transform, opacity, filter;
   }
 
-  .chat-activity-tab {
-    clip-path: inset(-8px -8px 0 -8px);
-  }
-
   .chat-message {
     contain: layout style paint;
-    content-visibility: auto;
-    contain-intrinsic-size: auto 180px;
-  }
-
-  .chat-message.assistant {
-    contain-intrinsic-size: auto 240px;
-  }
-
-  .chat-message.user,
-  .chat-message.tool,
-  .chat-message.error {
-    contain-intrinsic-size: auto 96px;
+    /* No content-visibility here. Lazy rows already drop distant content.
+       content-visibility sizes a mounted row at contain-intrinsic-size until
+       it is almost on screen, then swaps in the real height. On mobile that
+       swap happens under the finger and the transcript jumps. */
   }
 
   /* Mobile touch optimization and safe areas */
@@ -706,6 +728,13 @@
     }
     
     .chat-message {
+      touch-action: pan-y;
+    }
+
+    /* The button/link rule above sets touch-action: manipulation, which wins
+       for the element under the finger. A drag that starts on a link, copy
+       button, or image then waits to decide the gesture and the scroll hitches. */
+    .chat-messages-pane :is(button, a, [role='button'], .cursor-pointer) {
       touch-action: pan-y;
     }
     

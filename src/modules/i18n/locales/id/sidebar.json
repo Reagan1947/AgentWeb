@@ -20,7 +20,7 @@
     "runClaudeCli": "Jalankan Claude CLI di direktori proyek untuk memulai"
   },
   "app": {
-    "title": "CloudCLI",
+    "title": "AgentWeb",
     "subtitle": "Antarmuka asisten coding AI"
   },
   "sessions": {
@@ -33,7 +33,7 @@
     "unnamed": "Tanpa Nama",
     "loading": "Memuat...",
     "showMore": "Tampilkan sesi lainnya",
-    "select": "Pilih",
+    "select": "Kelola sesi",
     "selectAll": "Pilih semua",
     "selectAllLoaded": "Pilih semua yang dimuat",
     "clearSelection": "Hapus pilihan",
@@ -74,7 +74,6 @@
     "save": "Simpan",
     "delete": "Hapus",
     "rename": "Ganti Nama",
-    "joinCommunity": "Gabung Komunitas",
     "reportIssue": "Laporkan Masalah",
     "starOnGithub": "Beri Bintang di GitHub"
   },
@@ -147,6 +146,7 @@
   },
   "recent": {
     "title": "Percakapan terbaru",
+    "activityHint": "Aktivitas terbaru di seluruh workspace",
     "emptyTitle": "Belum ada percakapan",
     "emptyDescription": "Percakapan yang paling baru diperbarui akan muncul di sini.",
     "loadFailed": "Gagal memuat percakapan terbaru",

@@ -195,10 +195,6 @@ export default function Shell({
     () => (selectedSession ? getSessionTitle(selectedSession) : null),
     [selectedSession],
   );
-  const sessionDisplayNameShort = useMemo(
-    () => (sessionDisplayName ? sessionDisplayName.slice(0, 30) : null),
-    [sessionDisplayName],
-  );
   const sessionDisplayNameLong = useMemo(
     () => (sessionDisplayName ? sessionDisplayName.slice(0, 50) : null),
     [sessionDisplayName],
@@ -295,14 +291,16 @@ export default function Shell({
   const overlayMode = !isInitialized ? 'loading' : isConnecting ? 'connecting' : !isConnected ? 'connect' : null;
   const overlayDescription = overlayMode === 'connecting' ? connectingDescription : readyDescription;
 
+  // Dark terminal canvas is black. The card tile would show through the padding as a gray frame.
   return (
-    <div className="flex h-full w-full flex-col bg-card">
+    <div className="flex h-full w-full flex-col bg-card dark:bg-background">
       <ShellHeader
         isConnected={isConnected}
         isInitialized={isInitialized}
         isRestarting={isRestarting}
         hasSession={Boolean(selectedSession)}
-        sessionDisplayNameShort={sessionDisplayNameShort}
+        sessionTitle={sessionDisplayName}
+        sessionProvider={selectedSession?.__provider ?? null}
         onDisconnect={handleDisconnectShell}
         onRestart={handleRestartShell}
         statusNewSessionText={t('shell.status.newSession')}

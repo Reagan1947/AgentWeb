@@ -109,6 +109,7 @@
     "label": "Ayarlar",
     "agents": "Ajanlar",
     "appearance": "Görünüm",
+    "commands": "Komutlar",
     "git": "Git",
     "apiTokens": "API ve Token'lar",
     "tasks": "Görevler",
@@ -333,6 +334,9 @@
     }
   },
   "agents": {
+    "list": {
+      "description": "Hesabı, izinleri ve araçları yönetmek için bir ajan seçin."
+    },
     "authStatus": {
       "checking": "Kontrol ediliyor...",
       "connected": "Bağlı",

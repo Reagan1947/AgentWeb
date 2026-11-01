@@ -109,7 +109,7 @@ const inputGroupButtonVariants = cva('flex items-center gap-2 text-sm shadow-non
 type InputGroupButtonProps = Omit<React.ComponentProps<typeof Button>, 'size'> &
   VariantProps<typeof inputGroupButtonVariants>
 
-/** shadcn/ui InputGroupButton. The chat composer's attach, command and send controls use it. */
+/** shadcn/ui InputGroupButton. The chat composer's footer icon buttons use it. */
 const InputGroupButton = React.forwardRef<HTMLButtonElement, InputGroupButtonProps>(
   ({ className, type = 'button', variant = 'ghost', size = 'xs', ...props }, ref) => {
     return (

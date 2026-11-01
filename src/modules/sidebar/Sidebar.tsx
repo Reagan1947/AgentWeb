@@ -241,7 +241,8 @@ function Sidebar({
     <>
         <SidebarModals
           projects={projects}
-        showSettings={showSettings}
+          selectedProject={selectedProject}
+          showSettings={showSettings}
         settingsInitialTab={settingsInitialTab}
         onCloseSettings={onCloseSettings}
         showNewProject={showNewProject}
@@ -348,7 +349,6 @@ function Sidebar({
             restartRequired={restartRequired}
             releaseInfo={releaseInfo}
             latestVersion={latestVersion}
-            currentVersion={currentVersion}
             onShowVersionModal={() => setShowVersionModal(true)}
             onShowSettings={onShowSettings}
             projectListProps={projectListProps}

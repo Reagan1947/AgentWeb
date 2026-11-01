@@ -109,6 +109,7 @@
     "label": "設定",
     "agents": "エージェント",
     "appearance": "外観",
+    "commands": "コマンド",
     "git": "Git",
     "apiTokens": "API & トークン",
     "tasks": "タスク",
@@ -332,6 +333,9 @@
     }
   },
   "agents": {
+    "list": {
+      "description": "エージェントを選んで、アカウント、権限、ツールを管理します。"
+    },
     "authStatus": {
       "checking": "確認中...",
       "connected": "接続済み",

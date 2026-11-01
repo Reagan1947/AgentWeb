@@ -102,6 +102,7 @@ async function withGateway(
       {
         runtime: {
           hasRuntime: () => true,
+          abort: async () => true,
           run: async (runProvider: string, command: string, options: Record<string, unknown>) => {
             runs.push({ provider: runProvider, command, options });
             if (holdRun) {
@@ -226,6 +227,29 @@ test('a provider that cannot re-run from a point is refused rather than sending 
 
     assert.equal(runs.length, 0);
     assert.equal(socket.frames.at(-1)?.code, 'EDIT_NOT_SUPPORTED');
+  });
+});
+
+test('steer interrupts the turn already running and sends its own message', async () => {
+  await withGateway('claude', async ({ socket, runs }) => {
+    holdTheNextRun();
+    socket.emit('message', JSON.stringify({
+      type: 'chat.send',
+      sessionId: SESSION_ID,
+      content: 'the turn in progress',
+    }));
+    await settle();
+    assert.equal(runs.length, 1);
+
+    socket.emit('message', JSON.stringify({
+      type: 'chat.send',
+      sessionId: SESSION_ID,
+      content: 'steer to this',
+      interrupt: true,
+    }));
+    await settle();
+
+    assert.deepEqual(runs.map((run) => run.command), ['the turn in progress', 'steer to this']);
   });
 });
 

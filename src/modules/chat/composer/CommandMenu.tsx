@@ -2,16 +2,19 @@ import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
 import type { CSSProperties, ReactElement } from 'react';
+import { CornerDownLeft } from 'lucide-react';
+
+import commandMarkUrl from '@/modules/chat/composer/command-mark.png';
+import skillMarkUrl from '@/modules/chat/composer/skill-mark.png';
 import {
-  CornerDownLeft,
-  Folder,
-  MessageSquare,
-  Sparkles,
-  Star,
-  Terminal,
-  User,
-  type LucideIcon,
-} from 'lucide-react';
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  ScrollArea,
+} from '@/shared/ui';
 
 type CommandMenuCommand = {
   name: string;
@@ -31,6 +34,10 @@ type CommandMenuProps = {
   position?: { top: number; left: number; bottom?: number };
   isOpen?: boolean;
   frequentCommands?: CommandMenuCommand[];
+  /** Renders in the plus menu instead of a portaled slash-command palette. */
+  contained?: boolean;
+  query?: string;
+  onQueryChange?: (query: string) => void;
 };
 
 type CommandMenuRow = {
@@ -45,7 +52,7 @@ const menuBaseStyle: CSSProperties = {
   borderRadius: '8px',
   boxShadow: '0 24px 60px rgba(2, 6, 23, 0.38), 0 0 0 1px rgba(148, 163, 184, 0.12)',
   zIndex: 1000,
-  padding: '6px',
+  padding: '4px',
   transition: 'opacity 150ms ease-in-out, transform 150ms ease-in-out',
   backdropFilter: 'blur(12px)',
 };
@@ -59,24 +66,6 @@ const namespaceLabels: Record<string, string> = {
   other: 'Other Commands',
 };
 
-const namespaceIcons: Record<string, LucideIcon> = {
-  frequent: Star,
-  builtin: Terminal,
-  skill: Sparkles,
-  project: Folder,
-  user: User,
-  other: MessageSquare,
-};
-
-const namespaceAccentClasses: Record<string, string> = {
-  frequent: 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-200',
-  builtin: 'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-400/20 dark:bg-sky-400/10 dark:text-sky-200',
-  skill: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-200',
-  project: 'border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-400/20 dark:bg-indigo-400/10 dark:text-indigo-200',
-  user: 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-400/20 dark:bg-rose-400/10 dark:text-rose-200',
-  other: 'border-gray-200 bg-gray-50 text-gray-600 dark:border-gray-500/20 dark:bg-gray-500/10 dark:text-gray-200',
-};
-
 const MENU_EDGE_GAP = 16;
 const MENU_MAX_HEIGHT = 360;
 const MENU_MIN_HEIGHT = 160;
@@ -86,10 +75,52 @@ const getCommandKey = (command: CommandMenuCommand) =>
 
 const getNamespace = (command: CommandMenuCommand) => command.namespace || command.type || 'other';
 
-const getNamespaceIcon = (namespace: string) => namespaceIcons[namespace] || namespaceIcons.other;
+/** Skills use the crossed-tools mark. Every other command uses the prompt mark. */
+function CommandMenuMark({ command }: { command: CommandMenuCommand }) {
+  const src = getNamespace(command) === 'skill' ? skillMarkUrl : commandMarkUrl;
+  return (
+    <span
+      aria-hidden
+      className="inline-block h-4 w-4 shrink-0 bg-current text-muted-foreground"
+      style={{
+        maskImage: `url("${src}")`,
+        WebkitMaskImage: `url("${src}")`,
+        maskSize: 'contain',
+        WebkitMaskSize: 'contain',
+        maskRepeat: 'no-repeat',
+        WebkitMaskRepeat: 'no-repeat',
+        maskPosition: 'center',
+        WebkitMaskPosition: 'center',
+        maskMode: 'alpha',
+      }}
+    />
+  );
+}
 
-const getNamespaceAccentClass = (namespace: string) =>
-  namespaceAccentClasses[namespace] || namespaceAccentClasses.other;
+function CommandMenuEntry({ command }: { command: CommandMenuCommand }) {
+  return (
+    <>
+      <CommandMenuMark command={command} />
+      <div className="min-w-0 flex-1">
+        <div className="flex min-w-0 items-center gap-1">
+          <span className="min-w-0 truncate text-[13px] font-medium leading-4 text-foreground" title={command.name}>
+            {command.name}
+          </span>
+          {command.metadata?.type && (
+            <span className="shrink-0 rounded border border-border bg-muted px-px text-[9px] font-medium leading-none text-muted-foreground">
+              {command.metadata.type}
+            </span>
+          )}
+        </div>
+        {command.description && (
+          <div className="truncate text-[11px] leading-[13px] text-muted-foreground" title={command.description}>
+            {command.description}
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
 
 const getMenuPosition = (position: { top: number; left: number; bottom?: number }): CSSProperties => {
   if (typeof window === 'undefined') {
@@ -124,9 +155,48 @@ const getMenuPosition = (position: { top: number; left: number; bottom?: number 
   };
 };
 
+/** Search field at the top of the plus menu's command list. Must render inside Command. */
+function ContainedCommandSearch({
+  query,
+  onQueryChange,
+}: {
+  query: string;
+  onQueryChange: (query: string) => void;
+}) {
+  const { t } = useTranslation('chat');
+  const inputRef = useRef<HTMLInputElement>(null);
+  const label = t('input.searchCommands', { defaultValue: 'Search commands' });
+
+  useEffect(() => {
+    // The menu item that opened this sheet is focused first, then unmounted.
+    // Focus the search after that handoff so typing filters commands.
+    const focusSearch = () => inputRef.current?.focus();
+    const frame = window.requestAnimationFrame(focusSearch);
+    const timer = window.setTimeout(focusSearch, 0);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.clearTimeout(timer);
+    };
+  }, []);
+
+  return (
+    <CommandInput
+      ref={inputRef}
+      value={query}
+      onValueChange={onQueryChange}
+      onPointerDown={(event) => event.stopPropagation()}
+      placeholder={label}
+      aria-label={label}
+      containerClassName="border-b-0 px-2.5"
+      className="h-8 py-1.5 text-[13px] font-sans"
+    />
+  );
+}
+
 /**
- * Rendered by chat's ChatComposer as the slash-command palette that appears
- * while the user is typing a command in the input.
+ * Rendered by chat's ChatComposer as the slash-command palette, and inside the
+ * plus menu once Show all commands replaces the action list. Both scroll with
+ * the overlay thumb so the native scrollbar does not take width from the rows.
  */
 export default function CommandMenu({
   commands = [],
@@ -136,6 +206,9 @@ export default function CommandMenu({
   position = { top: 0, left: 0 },
   isOpen = false,
   frequentCommands = [],
+  contained = false,
+  query = '',
+  onQueryChange,
 }: CommandMenuProps) {
   const { t } = useTranslation();
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -143,7 +216,7 @@ export default function CommandMenu({
   const menuPosition = getMenuPosition(position);
 
   useEffect(() => {
-    if (!isOpen) {
+    if (!isOpen || contained) {
       return;
     }
     const handleClickOutside = (event: MouseEvent) => {
@@ -156,7 +229,7 @@ export default function CommandMenu({
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isOpen, onClose]);
+  }, [contained, isOpen, onClose]);
 
   useEffect(() => {
     if (!selectedItemRef.current || !menuRef.current) {
@@ -228,7 +301,7 @@ export default function CommandMenu({
   const renderInPortal = (node: ReactElement) =>
     typeof document === 'undefined' ? node : createPortal(node, document.body);
 
-  if (commands.length === 0) {
+  if (!contained && commands.length === 0) {
     return renderInPortal(
       <div
         ref={menuRef}
@@ -248,20 +321,17 @@ export default function CommandMenu({
     );
   }
 
-  return renderInPortal(
-    <div
-      ref={menuRef}
-      role="listbox"
-      aria-label={t('chat:misc.availableCommands')}
-      className="command-menu border border-border bg-popover/95 text-popover-foreground"
-      style={{ ...menuBaseStyle, ...menuPosition, opacity: 1, transform: 'translateY(0)' }}
-    >
-      {orderedNamespaces.map((namespace) => (
+  const groups = commands.length === 0 ? (
+    <div className="px-3 py-6 text-center text-sm text-muted-foreground">
+      {t('chat:input.noMatchingCommands', { defaultValue: 'No commands available' })}
+    </div>
+  ) : (
+    orderedNamespaces.map((namespace) => (
         <div key={namespace} className="command-group">
           {orderedNamespaces.length > 1 && (
-            <div className="flex items-center justify-between px-2 pb-1.5 pt-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <div className="flex items-center justify-between px-2 pb-0.5 pt-1.5 text-[11px] font-medium text-muted-foreground">
               <span>{namespaceLabels[namespace] || namespace}</span>
-              <span className="rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+              <span className="rounded border border-border bg-muted px-1 py-px text-[10px] text-muted-foreground">
                 {(groupedCommands[namespace] || []).length}
               </span>
             </div>
@@ -269,15 +339,13 @@ export default function CommandMenu({
 
           {(groupedCommands[namespace] || []).map(({ command, commandIndex, renderKey }) => {
             const isSelected = commandIndex === selectedIndex;
-            const NamespaceIcon = getNamespaceIcon(namespace);
-            const accentClass = getNamespaceAccentClass(namespace);
             return (
               <div
                 key={renderKey}
                 ref={isSelected ? selectedItemRef : null}
                 role="option"
                 aria-selected={isSelected}
-                className={`command-item group relative mb-1 flex cursor-pointer items-start gap-2 rounded-md border px-2.5 py-2 transition-all ${
+                className={`command-item group relative mb-0.5 flex cursor-pointer items-center gap-2 rounded-md border px-2 py-1 font-sans transition-all ${
                   isSelected
                     ? 'border-primary/30 bg-primary/10 shadow-sm'
                     : 'border-transparent bg-transparent hover:border-border hover:bg-accent'
@@ -287,44 +355,108 @@ export default function CommandMenu({
                 onMouseDown={(event) => event.preventDefault()}
               >
                 {isSelected && (
-                  <span className="absolute bottom-1.5 left-1.5 top-1.5 w-0.5 rounded-full bg-primary" />
+                  <span className="absolute bottom-1 left-1 top-1 w-0.5 rounded-full bg-primary" />
                 )}
-                <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border ${accentClass}`}>
-                  <NamespaceIcon aria-hidden="true" size={14} strokeWidth={2.2} />
-                </span>
-                <div className="min-w-0 flex-1 pr-1">
-                  <div className={`flex min-w-0 items-center gap-2 ${command.description ? 'mb-1' : 'mb-0'}`}>
-                    <span
-                      className="min-w-0 truncate font-mono text-[13px] font-semibold text-foreground"
-                      title={command.name}
-                    >
-                      {command.name}
-                    </span>
-                    {command.metadata?.type && (
-                      <span className="command-metadata-badge shrink-0 rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground shadow-sm">
-                        {command.metadata.type}
-                      </span>
-                    )}
-                  </div>
-                  {command.description && (
-                    <div
-                      className="truncate whitespace-nowrap text-[12px] leading-4 text-muted-foreground"
-                      title={command.description}
-                    >
-                      {command.description}
-                    </div>
-                  )}
-                </div>
+                <CommandMenuEntry command={command} />
                 {isSelected && (
-                  <span className="mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded border border-primary/30 bg-card text-primary shadow-sm">
-                    <CornerDownLeft aria-hidden="true" size={13} strokeWidth={2.2} />
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded border border-primary/30 bg-card text-primary shadow-sm">
+                    <CornerDownLeft aria-hidden="true" size={12} strokeWidth={2.2} />
                   </span>
                 )}
               </div>
             );
           })}
         </div>
-      ))}
+      ))
+  );
+
+  if (contained) {
+    return (
+      <Command
+        shouldFilter={false}
+        label={t('chat:input.searchCommands', { defaultValue: 'Search commands' })}
+        onKeyDown={(event) => {
+          // Keep arrow keys and typing inside cmdk. Escape still bubbles so the dropdown closes.
+          if (event.key !== 'Escape') {
+            event.stopPropagation();
+          }
+        }}
+        className="w-[min(22rem,calc(100vw-2rem))] font-sans text-popover-foreground"
+      >
+        {onQueryChange && <ContainedCommandSearch query={query} onQueryChange={onQueryChange} />}
+        <ScrollArea
+          overlayScrollbar
+          className="w-full [&>div:first-child]:h-auto [&>div:first-child]:max-h-[min(20rem,calc(70vh-3rem))]"
+        >
+          <CommandList label={t('chat:misc.availableCommands')} className="max-h-none overflow-y-visible p-1 font-sans">
+            <CommandEmpty>
+              {t('chat:input.noMatchingCommands', { defaultValue: 'No commands available' })}
+            </CommandEmpty>
+            {commands.length > 0 && orderedNamespaces.map((namespace) => (
+              <CommandGroup
+                key={namespace}
+                heading={orderedNamespaces.length > 1 ? (
+                  <span className="flex w-full items-center justify-between gap-2">
+                    <span>{namespaceLabels[namespace] || namespace}</span>
+                    <span className="rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                      {(groupedCommands[namespace] || []).length}
+                    </span>
+                  </span>
+                ) : undefined}
+                className="p-0.5 [&_[cmdk-group-heading]]:w-full [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1 [&_[cmdk-group-heading]]:text-[11px] [&_[cmdk-group-heading]]:font-medium"
+              >
+                {(groupedCommands[namespace] || []).map(({ command, commandIndex, renderKey }) => (
+                    <CommandItem
+                      key={renderKey}
+                      value={renderKey}
+                      className="mb-0.5 items-center gap-2 rounded-md px-2 py-1 font-sans"
+                      onMouseDown={(event) => event.preventDefault()}
+                      onSelect={() => {
+                        if (commandIndex < 0) {
+                          return;
+                        }
+                        onSelect?.(command, commandIndex, false);
+                      }}
+                    >
+                      <CommandMenuEntry command={command} />
+                    </CommandItem>
+                ))}
+              </CommandGroup>
+            ))}
+          </CommandList>
+        </ScrollArea>
+      </Command>
+    );
+  }
+
+  const menuMaxHeight = typeof menuPosition.maxHeight === 'number'
+    ? `${menuPosition.maxHeight}px`
+    : menuPosition.maxHeight ?? `${MENU_MAX_HEIGHT}px`;
+  // The 1px border sits outside the scrolling viewport under border-box sizing.
+  const slashMenuScrollMaxHeight = `calc(${menuMaxHeight} - 2px)`;
+
+  return renderInPortal(
+    <div
+      ref={menuRef}
+      role="listbox"
+      aria-label={t('chat:misc.availableCommands')}
+      className="command-menu border border-border bg-popover/95 font-sans text-popover-foreground"
+      style={{
+        ...menuBaseStyle,
+        ...menuPosition,
+        overflowY: 'hidden',
+        padding: 0,
+        opacity: 1,
+        transform: 'translateY(0)',
+      }}
+    >
+      <ScrollArea
+        overlayScrollbar
+        className="w-full [&>div:first-child]:h-auto [&>div:first-child]:max-h-[var(--slash-menu-max-height)]"
+        style={{ '--slash-menu-max-height': slashMenuScrollMaxHeight } as CSSProperties}
+      >
+        <div className="p-1">{groups}</div>
+      </ScrollArea>
     </div>
   );
 }

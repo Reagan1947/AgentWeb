@@ -20,7 +20,7 @@
     "runClaudeCli": "Začněte spuštěním Claude CLI v adresáři projektu"
   },
   "app": {
-    "title": "CloudCLI",
+    "title": "AgentWeb",
     "subtitle": "Rozhraní AI asistenta pro programování"
   },
   "sessions": {
@@ -70,7 +70,6 @@
     "save": "Uložit",
     "delete": "Smazat",
     "rename": "Přejmenovat",
-    "joinCommunity": "Připojit se ke komunitě",
     "reportIssue": "Nahlásit problém",
     "starOnGithub": "Dát hvězdičku na GitHubu"
   },
@@ -158,6 +157,7 @@
   },
   "recent": {
     "title": "Nedávné konverzace",
+    "activityHint": "Nejnovější aktivita napříč pracovními prostory",
     "emptyTitle": "Zatím žádné konverzace",
     "emptyDescription": "Zde se zobrazí vaše naposledy aktualizované konverzace.",
     "loadFailed": "Nepodařilo se načíst nedávné konverzace",
@@ -168,6 +168,7 @@
     "title": "Právě běží",
     "emptyTitle": "Žádné běžící relace",
     "emptyDescription": "Aktivní práce se zobrazí zde, zatímco provider zpracovává požadavek.",
+    "activeHint": "Relace, které provider právě zpracovává",
     "noMatchingSessions": "Hledání neodpovídá žádná běžící relace."
   },
   "archived": {

@@ -123,7 +123,7 @@ function overlayThumbGeometry(
   return { height, offset };
 }
 
-/** Used by the file-tree and sidebar modules for consistently styled scroll containers. The sidebar passes `overlayScrollbar` so its list keeps a thin thumb that does not take width from the rows, and `edgeFade` so rows soften as they scroll past the header and footer. */
+/** Used by the file-tree, sidebar, chat, and settings modules for consistently styled scroll containers. The sidebar passes `overlayScrollbar` so its list keeps a thin thumb that does not take width from the rows, and `edgeFade` so rows soften as they scroll past the header and footer. Chat's command menus and the settings dialog's right pane pass `overlayScrollbar` for that same thin thumb. */
 export const ScrollArea = React.forwardRef<HTMLDivElement, ScrollAreaProps>(
   ({ className, children, overlayScrollbar = false, edgeFade = false, ...props }, ref) => {
     const viewportRef = React.useRef<HTMLDivElement | null>(null);

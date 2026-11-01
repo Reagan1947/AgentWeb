@@ -4,7 +4,7 @@ import { Search } from 'lucide-react';
 
 import { cn } from '@/shared/utils';
 
-/** Used by the command-palette module and by chat's provider picker for keyboard-driven filtered lists. */
+/** Used by the command palette, chat's provider picker, and the composer command sheet. */
 export const Command = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive>,
   React.ComponentPropsWithoutRef<typeof CommandPrimitive>
@@ -17,12 +17,17 @@ export const Command = React.forwardRef<
 ));
 Command.displayName = CommandPrimitive.displayName;
 
-/** Search input of Command, used by the command-palette and chat modules. */
+type CommandInputProps = React.ComponentPropsWithoutRef<typeof CommandPrimitive.Input> & {
+  /** Classes for the icon row. The composer command sheet uses this to drop the divider under search. */
+  containerClassName?: string;
+};
+
+/** Search input of Command, used by the command palette, chat's provider picker, and the composer command sheet. */
 export const CommandInput = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive.Input>,
-  React.ComponentPropsWithoutRef<typeof CommandPrimitive.Input>
->(({ className, ...props }, ref) => (
-  <div className="flex items-center border-b px-3">
+  CommandInputProps
+>(({ className, containerClassName, ...props }, ref) => (
+  <div className={cn('flex items-center border-b px-3', containerClassName)}>
     <Search className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
     <CommandPrimitive.Input
       ref={ref}
@@ -37,7 +42,7 @@ export const CommandInput = React.forwardRef<
 ));
 CommandInput.displayName = CommandPrimitive.Input.displayName;
 
-/** Scrollable result list of Command, used by the command-palette and chat modules. */
+/** Scrollable result list of Command, used by the command palette, chat's provider picker, and the composer command sheet. */
 export const CommandList = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive.List>,
   React.ComponentPropsWithoutRef<typeof CommandPrimitive.List>
@@ -50,7 +55,7 @@ export const CommandList = React.forwardRef<
 ));
 CommandList.displayName = CommandPrimitive.List.displayName;
 
-/** Empty-result slot of Command, used by the command-palette and chat modules. */
+/** Empty-result slot of Command, used by the command palette, chat's provider picker, and the composer command sheet. */
 export const CommandEmpty = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive.Empty>,
   React.ComponentPropsWithoutRef<typeof CommandPrimitive.Empty>
@@ -63,7 +68,7 @@ export const CommandEmpty = React.forwardRef<
 ));
 CommandEmpty.displayName = CommandPrimitive.Empty.displayName;
 
-/** Section heading of Command, used by the command-palette and chat modules. */
+/** Section heading of Command, used by the command palette, chat's provider picker, and the composer command sheet. */
 export const CommandGroup = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive.Group>,
   React.ComponentPropsWithoutRef<typeof CommandPrimitive.Group>
@@ -80,7 +85,7 @@ export const CommandGroup = React.forwardRef<
 ));
 CommandGroup.displayName = CommandPrimitive.Group.displayName;
 
-/** Selectable row of Command, used by the command-palette and chat modules. */
+/** Selectable row of Command, used by the command palette, chat's provider picker, and the composer command sheet. */
 export const CommandItem = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive.Item>,
   React.ComponentPropsWithoutRef<typeof CommandPrimitive.Item>

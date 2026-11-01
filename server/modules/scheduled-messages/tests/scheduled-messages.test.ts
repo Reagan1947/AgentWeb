@@ -139,9 +139,10 @@ test('a queued message stays pending while its session is busy', async () => {
     const runs: RunCall[] = [];
     assert.equal(await dispatchQueuedMessages(createRuntime(runs)), 0);
     assert.equal(runs.length, 0);
-    assert.deepEqual(sessionDraftsDb.getDrafts(userId)[0]?.queuedMessage, {
-      content: 'send after this run',
-    });
+    assert.deepEqual(
+      sessionDraftsDb.getDrafts(userId)[0]?.queuedMessages.map((message) => message.content),
+      ['send after this run'],
+    );
   });
 });
 
@@ -170,9 +171,10 @@ test('a queued message waits for background work its session\'s last turn left r
     // Starting B now would replace that process and stop the command.
     assert.equal(await dispatchQueuedMessages(runtime), 0);
     assert.equal(runs.length, 0);
-    assert.deepEqual(sessionDraftsDb.getDrafts(userId)[0]?.queuedMessage, {
-      content: 'send after the background job',
-    });
+    assert.deepEqual(
+      sessionDraftsDb.getDrafts(userId)[0]?.queuedMessages.map((message) => message.content),
+      ['send after the background job'],
+    );
 
     // Once the work has reported back, B goes on the next pass.
     backgroundWork = false;
@@ -183,7 +185,7 @@ test('a queued message waits for background work its session\'s last turn left r
   });
 });
 
-test('follow-ups queued during one turn are all sent, once, in order, as the next turn', async () => {
+test('follow-ups queued during one turn are sent one at a time, in order, each as its own turn', async () => {
   await withIsolatedDatabase(async (userId) => {
     for (const content of ['follow-up A', 'follow-up B', 'follow-up C']) {
       sessionDraftsDb.appendQueuedMessage(userId, SESSION_ID, { content, options: { model: 'opus' }, attachments: [] });
@@ -191,10 +193,15 @@ test('follow-ups queued during one turn are all sent, once, in order, as the nex
 
     const runs: RunCall[] = [];
     assert.equal(await dispatchQueuedMessages(createRuntime(runs)), 1);
+    assert.deepEqual(
+      sessionDraftsDb.getDrafts(userId)[0]?.queuedMessages.map((message) => message.content),
+      ['follow-up B', 'follow-up C'],
+    );
+    assert.equal(await dispatchQueuedMessages(createRuntime(runs)), 1);
+    assert.equal(await dispatchQueuedMessages(createRuntime(runs)), 1);
     assert.equal(await dispatchQueuedMessages(createRuntime(runs)), 0, 'nothing is left to send');
 
-    assert.equal(runs.length, 1);
-    assert.equal(runs[0].command, 'follow-up A\n\nfollow-up B\n\nfollow-up C');
+    assert.deepEqual(runs.map((run) => run.command), ['follow-up A', 'follow-up B', 'follow-up C']);
     assert.equal(runs[0].options.model, 'opus');
     assert.equal(sessionDraftsDb.getDrafts(userId).length, 0);
   });

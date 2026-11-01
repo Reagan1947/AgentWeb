@@ -105,9 +105,9 @@ test('drafts round-trip text and queued message per scope', async () => {
     const byScope = new Map(drafts.map((draft) => [draft.scope, draft]));
 
     assert.equal(byScope.get('session-a')?.text, 'half typed');
-    assert.equal(byScope.get('session-a')?.queuedMessage, null);
+    assert.deepEqual(byScope.get('session-a')?.queuedMessages, []);
     assert.equal(byScope.get('project:p1')?.text, '');
-    assert.deepEqual(byScope.get('project:p1')?.queuedMessage, { content: 'run it' });
+    assert.deepEqual(byScope.get('project:p1')?.queuedMessages.map((message) => message.content), ['run it']);
   });
 });
 
@@ -135,23 +135,27 @@ test('deleteDraft removes only the named scope', async () => {
 });
 
 const queuedIn = (scope: string) => (
-  sessionDraftsDb.getDrafts(USER_ID).find((draft) => draft.scope === scope)?.queuedMessage ?? null
+  sessionDraftsDb.getDrafts(USER_ID).find((draft) => draft.scope === scope)?.queuedMessages ?? []
 );
+
+const queuedContents = (scope: string) => queuedIn(scope).map((message) => message.content);
 
 // What the dispatcher holds after listing a scope's queued message.
 const claimCandidate = (scope: string) => {
   const row = getConnection()
     .prepare('SELECT queued_message FROM session_drafts WHERE user_id = ? AND draft_scope = ?')
     .get(USER_ID, scope) as { queued_message: string };
+  const parsed = JSON.parse(row.queued_message) as unknown;
+  const head = Array.isArray(parsed) ? parsed[0] : parsed;
   return {
     userId: USER_ID,
     sessionId: scope,
-    queuedMessage: JSON.parse(row.queued_message) as unknown,
+    queuedMessage: head,
     claimToken: row.queued_message,
   };
 };
 
-test('follow-ups queued while one waits are appended in order, not overwritten', async () => {
+test('follow-ups queued while one waits are kept as separate turns, in order', async () => {
   await withDatabase(() => {
     sessionDraftsDb.saveDraftText(USER_ID, 'session-a', 'still typing');
 
@@ -161,21 +165,26 @@ test('follow-ups queued while one waits are appended in order, not overwritten',
     const second = sessionDraftsDb.appendQueuedMessage(USER_ID, 'session-a', {
       content: 'B', attachments: [],
     });
-    const third = sessionDraftsDb.appendQueuedMessage(USER_ID, 'session-a', {
+    sessionDraftsDb.appendQueuedMessage(USER_ID, 'session-a', {
       content: 'C', options: { model: 'opus' }, attachments: [{ name: 'c.txt' }],
     });
 
-    assert.equal(first?.appended, false);
-    assert.equal(second?.appended, true);
-    assert.equal(third?.appended, true);
-    const expected = {
-      content: 'A\n\nB\n\nC',
-      options: { model: 'opus' },
-      attachments: [{ name: 'a.png' }, { name: 'c.txt' }],
-    };
-    assert.deepEqual(third?.queuedMessage, expected);
-    assert.deepEqual(queuedIn('session-a'), expected);
+    assert.equal(first.queuedMessages.length, 1);
+    assert.equal(second.queuedMessages.length, 2);
+    assert.deepEqual(queuedContents('session-a'), ['A', 'B', 'C']);
+    assert.deepEqual(queuedIn('session-a').map((message) => message.options?.model ?? null), ['sonnet', null, 'opus']);
+    assert.deepEqual(queuedIn('session-a').flatMap((message) => message.attachments), [{ name: 'a.png' }, { name: 'c.txt' }]);
     assert.equal(sessionDraftsDb.getDrafts(USER_ID)[0]?.text, 'still typing', 'the draft text is untouched');
+
+    const firstId = first.queuedMessages[0]?.id ?? '';
+    sessionDraftsDb.appendQueuedMessage(USER_ID, 'session-a', {
+      id: firstId,
+      content: 'A revised',
+      options: { model: 'sonnet' },
+      attachments: [{ name: 'a.png' }],
+    });
+    assert.deepEqual(queuedContents('session-a'), ['A revised', 'B', 'C'], 'an edit replaces that turn and leaves the others');
+    assert.equal(queuedIn('session-a')[0]?.id, firstId);
   });
 });
 
@@ -186,8 +195,8 @@ test('a follow-up queued after the dispatcher claimed the waiting message is que
 
     const result = sessionDraftsDb.appendQueuedMessage(USER_ID, 'session-a', { content: 'B', attachments: [] });
 
-    assert.equal(result?.appended, false);
-    assert.deepEqual(queuedIn('session-a'), { content: 'B', attachments: [] }, 'A is not sent a second time');
+    assert.deepEqual(result.queuedMessages.map((message) => message.content), ['B']);
+    assert.deepEqual(queuedContents('session-a'), ['B'], 'A is not sent a second time');
   });
 });
 
@@ -198,7 +207,7 @@ test('a claim listed before a follow-up was appended no longer matches, so it is
     sessionDraftsDb.appendQueuedMessage(USER_ID, 'session-a', { content: 'B', attachments: [] });
 
     assert.equal(sessionDraftsDb.claimQueuedMessage(listedBeforeB), false);
-    assert.equal((queuedIn('session-a') as { content: string }).content, 'A\n\nB');
+    assert.deepEqual(queuedContents('session-a'), ['A', 'B']);
   });
 });
 
@@ -207,15 +216,15 @@ test('saving draft text leaves the queued message alone and keeps the row while 
     sessionDraftsDb.appendQueuedMessage(USER_ID, 'session-a', { content: 'A', attachments: [] });
 
     sessionDraftsDb.saveDraftText(USER_ID, 'session-a', 'typing the next one');
-    assert.deepEqual(queuedIn('session-a'), { content: 'A', attachments: [] });
+    assert.deepEqual(queuedContents('session-a'), ['A']);
 
     sessionDraftsDb.saveDraftText(USER_ID, 'session-a', '');
-    assert.deepEqual(queuedIn('session-a'), { content: 'A', attachments: [] });
+    assert.deepEqual(queuedContents('session-a'), ['A']);
 
     // After a claim, a text save must not bring the sent message back.
     assert.equal(sessionDraftsDb.claimQueuedMessage(claimCandidate('session-a')), true);
     sessionDraftsDb.saveDraftText(USER_ID, 'session-a', 'x');
-    assert.equal(queuedIn('session-a'), null);
+    assert.deepEqual(queuedIn('session-a'), []);
 
     // And once nothing is left, the row goes.
     sessionDraftsDb.saveDraftText(USER_ID, 'session-a', '');
@@ -233,32 +242,21 @@ test('clearing the queued message keeps the draft text, and drops an emptied row
     sessionDraftsDb.clearQueuedMessage(USER_ID, 'session-b');
 
     assert.deepEqual(
-      sessionDraftsDb.getDrafts(USER_ID).map((draft) => [draft.scope, draft.text, draft.queuedMessage]),
-      [['session-a', 'keep me', null]],
+      sessionDraftsDb.getDrafts(USER_ID).map((draft) => [draft.scope, draft.text, draft.queuedMessages]),
+      [['session-a', 'keep me', []]],
     );
   });
 });
 
-test('a slash command is never merged with another queued message, in either order', async () => {
+test('a slash command is queued as its own later turn, in either order', async () => {
   await withDatabase(() => {
     sessionDraftsDb.appendQueuedMessage(USER_ID, 'session-a', { content: 'fix the test', attachments: [] });
-    assert.equal(
-      sessionDraftsDb.appendQueuedMessage(USER_ID, 'session-a', { content: '/compact', attachments: [] }),
-      null,
-    );
-    assert.deepEqual(queuedIn('session-a'), { content: 'fix the test', attachments: [] }, 'the waiting text is kept as it was');
+    sessionDraftsDb.appendQueuedMessage(USER_ID, 'session-a', { content: '/compact', attachments: [] });
+    assert.deepEqual(queuedContents('session-a'), ['fix the test', '/compact']);
 
     sessionDraftsDb.appendQueuedMessage(USER_ID, 'session-b', { content: '  /review src', attachments: [] });
-    assert.equal(
-      sessionDraftsDb.appendQueuedMessage(USER_ID, 'session-b', { content: 'then fix it', attachments: [] }),
-      null,
-    );
-    assert.deepEqual(queuedIn('session-b'), { content: '  /review src', attachments: [] }, 'the waiting command is kept as it was');
-
-    // On its own, with nothing waiting, a command is queued as before.
-    assert.equal(sessionDraftsDb.claimQueuedMessage(claimCandidate('session-a')), true);
-    const alone = sessionDraftsDb.appendQueuedMessage(USER_ID, 'session-a', { content: '/compact', attachments: [] });
-    assert.deepEqual(alone, { queuedMessage: { content: '/compact', attachments: [] }, appended: false });
+    sessionDraftsDb.appendQueuedMessage(USER_ID, 'session-b', { content: 'then fix it', attachments: [] });
+    assert.deepEqual(queuedContents('session-b'), ['  /review src', 'then fix it']);
   });
 });
 
@@ -271,21 +269,30 @@ test('a claim restored after losing a race goes back in front of a follow-up que
 
     sessionDraftsDb.restoreQueuedMessage(claimed);
 
-    assert.deepEqual(queuedIn('session-a'), {
-      content: 'A\n\nB',
-      options: { model: 'opus' },
-      attachments: [{ name: 'a.png' }],
-    });
+    assert.deepEqual(queuedIn('session-a').map((message) => ({
+      content: message.content,
+      options: message.options ?? null,
+      attachments: message.attachments,
+    })), [
+      { content: 'A', options: null, attachments: [{ name: 'a.png' }] },
+      { content: 'B', options: { model: 'opus' }, attachments: [] },
+    ]);
   });
 });
 
-test('an attachments-only message merged with a later text gains no leading blank line', async () => {
+test('an attachments-only message stays its own turn ahead of a later text', async () => {
   await withDatabase(() => {
     sessionDraftsDb.appendQueuedMessage(USER_ID, 'session-a', { content: '', attachments: [{ name: 'a.png' }] });
 
-    const result = sessionDraftsDb.appendQueuedMessage(USER_ID, 'session-a', { content: 'B', attachments: [] });
+    sessionDraftsDb.appendQueuedMessage(USER_ID, 'session-a', { content: 'B', attachments: [] });
 
-    assert.deepEqual(result?.queuedMessage, { content: 'B', attachments: [{ name: 'a.png' }] });
+    assert.deepEqual(queuedIn('session-a').map((message) => ({
+      content: message.content,
+      attachments: message.attachments,
+    })), [
+      { content: '', attachments: [{ name: 'a.png' }] },
+      { content: 'B', attachments: [] },
+    ]);
   });
 });
 
@@ -299,6 +306,10 @@ test('a claim restored after its emptied row was removed is written back', async
 
     sessionDraftsDb.restoreQueuedMessage(claimed);
 
-    assert.deepEqual(queuedIn('session-a'), { content: 'A', attachments: [] });
+    const restored = queuedIn('session-a');
+    assert.deepEqual(restored.map(({ content, attachments }) => ({ content, attachments })), [
+      { content: 'A', attachments: [] },
+    ]);
+    assert.equal(typeof restored[0]?.id, 'string');
   });
 });

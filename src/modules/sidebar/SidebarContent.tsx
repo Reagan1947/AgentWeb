@@ -122,7 +122,6 @@ type SidebarContentProps = {
   restartRequired: boolean;
   releaseInfo: ReleaseInfo | null;
   latestVersion: string | null;
-  currentVersion: string;
   onShowVersionModal: () => void;
   onShowSettings: () => void;
   projectListProps: SidebarProjectListProps;
@@ -169,7 +168,6 @@ export default function SidebarContent({
   restartRequired,
   releaseInfo,
   latestVersion,
-  currentVersion,
   onShowVersionModal,
   onShowSettings,
   projectListProps,
@@ -261,8 +259,8 @@ export default function SidebarContent({
                           session.provider,
                         )}
                       >
-                        <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md bg-muted/60">
-                          <LLMProviderLogo provider={session.provider} className="h-3.5 w-3.5" />
+                        <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md bg-muted/60">
+                          <LLMProviderLogo provider={session.provider} className="h-3 w-3" />
                         </span>
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-[13px] font-normal leading-4 text-foreground">
@@ -393,40 +391,45 @@ export default function SidebarContent({
           />
         ) : searchMode === 'running' ? (
           projectListProps.filteredProjects.length === 0 ? (
-            <div className="px-4 py-12 text-center md:py-8">
-              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-lg border border-border/70 bg-muted/50 md:mb-3">
-                <Activity className="h-6 w-6 text-muted-foreground" />
+            <div className="px-3 py-8 text-center">
+              <div className="mx-auto max-w-[240px] rounded-2xl border border-dashed border-border/80 bg-muted/20 px-5 py-7">
+                <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-xl border border-border/70 bg-background shadow-sm">
+                  <Activity className="h-[18px] w-[18px] text-muted-foreground" />
+                </div>
+                <h3 className="text-sm font-medium text-foreground">
+                  {t('running.emptyTitle', 'No sessions running')}
+                </h3>
+                <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+                  {runningSessionsCount > 0
+                    ? t('running.noMatchingSessions', 'No running sessions match this search.')
+                    : t('running.emptyDescription', 'Active work will appear here while a provider is processing.')}
+                </p>
               </div>
-              <h3 className="mb-2 text-base font-medium text-foreground md:mb-1">
-                {t('running.emptyTitle', 'No sessions running')}
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                {runningSessionsCount > 0
-                  ? t('running.noMatchingSessions', 'No running sessions match this search.')
-                  : t('running.emptyDescription', 'Active work will appear here while a provider is processing.')}
-              </p>
             </div>
           ) : (
-            <div className="space-y-2">
-              <div className="mx-2 flex items-center justify-between rounded-lg border border-border/60 bg-card/50 px-3 py-2 shadow-sm">
-                <div className="flex min-w-0 items-center gap-2">
-                  <span className="flex h-6 w-6 items-center justify-center rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                    <Activity className="h-3.5 w-3.5" />
-                  </span>
-                  <span className="truncate text-xs font-normal text-foreground">
-                    {t('running.title', 'Running now')}
+            <div className="space-y-2.5">
+              {/* Same inset as the archive header, so the title and count sit on the search field's edges. */}
+              <div className="pl-2 pr-0 md:-mr-1.5">
+                <div className="flex items-center justify-between px-1 pb-0.5 pt-0.5">
+                  <div className="min-w-0">
+                    <h2 className="text-xs font-medium leading-none text-foreground">
+                      {t('running.title', 'Running now')}
+                    </h2>
+                    <p className="mt-1 text-[10px] leading-none text-muted-foreground">
+                      {t('running.activeHint', 'Sessions a provider is processing')}
+                    </p>
+                  </div>
+                  <span className="rounded-full border border-border/60 bg-muted/40 px-2 py-0.5 text-[10px] tabular-nums text-muted-foreground">
+                    {runningSessionsCount}
                   </span>
                 </div>
-                <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-normal text-emerald-700 dark:text-emerald-300">
-                  {runningSessionsCount}
-                </span>
               </div>
               <SidebarProjectList {...projectListProps} />
             </div>
           )
         ) : searchMode === 'archived' ? (
           isArchivedSessionsLoading ? (
-            <div className="space-y-2 px-2 py-1" aria-live="polite" aria-busy="true">
+            <div className="space-y-2 py-1 pl-2 pr-0 md:-mr-1.5" aria-live="polite" aria-busy="true">
               <div className="flex items-center gap-2 px-1 py-2">
                 <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-muted/70">
                   <div className="h-3.5 w-3.5 animate-spin rounded-full border-[1.5px] border-muted-foreground/40 border-t-muted-foreground" />
@@ -441,7 +444,7 @@ export default function SidebarContent({
                 </div>
               </div>
               {[0, 1].map((skeleton) => (
-                <div key={skeleton} className="animate-pulse rounded-xl border border-border/50 bg-card/40 p-3">
+                <div key={skeleton} className="animate-pulse rounded-lg border border-border/50 bg-card/40 p-3">
                   <div className="flex items-center gap-2.5">
                     <div className="h-8 w-8 rounded-lg bg-muted" />
                     <div className="min-w-0 flex-1 space-y-2">
@@ -454,8 +457,8 @@ export default function SidebarContent({
             </div>
           ) : archivedProjects.length === 0 && groupedArchivedSessions.length === 0 ? (
             <div className="px-3 py-8 text-center">
-              <div className="mx-auto max-w-[240px] rounded-2xl border border-dashed border-border/80 bg-muted/20 px-5 py-7">
-                <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-xl border border-border/70 bg-background shadow-sm">
+              <div className="mx-auto max-w-[240px] rounded-lg border border-dashed border-border/80 bg-muted/20 px-5 py-7">
+                <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-lg border border-border/70 bg-background shadow-sm">
                   <Archive className="h-[18px] w-[18px] text-muted-foreground" />
                 </div>
                 <h3 className="text-sm font-medium text-foreground">
@@ -471,20 +474,16 @@ export default function SidebarContent({
               </div>
             </div>
           ) : (
-            <div className="space-y-2.5 px-2 pb-3">
+            <div className="space-y-2.5 pb-3 pl-2 pr-0 md:-mr-1.5">
+              {/* md:-mr-1.5 cancels the scroll area's desktop inset so these cards end on the search field's right edge. */}
               <div className="flex items-center justify-between px-1 pb-0.5 pt-0.5">
-                <div className="flex items-center gap-2">
-                  <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-muted/60 text-muted-foreground">
-                    <Archive className="h-3.5 w-3.5" />
-                  </span>
-                  <div>
-                    <h2 className="text-xs font-medium leading-none text-foreground">
-                      {t('archived.title', 'Archive')}
-                    </h2>
-                    <p className="mt-1 text-[10px] leading-none text-muted-foreground">
-                      {t('archived.restoreHint', 'Restore items whenever you need them')}
-                    </p>
-                  </div>
+                <div>
+                  <h2 className="text-xs font-medium leading-none text-foreground">
+                    {t('archived.title', 'Archive')}
+                  </h2>
+                  <p className="mt-1 text-[10px] leading-none text-muted-foreground">
+                    {t('archived.restoreHint', 'Restore items whenever you need them')}
+                  </p>
                 </div>
                 <span
                   className="rounded-full border border-border/60 bg-muted/40 px-2 py-0.5 text-[10px] tabular-nums text-muted-foreground"
@@ -503,7 +502,7 @@ export default function SidebarContent({
                 return (
                   <section
                     key={project.projectId}
-                    className="group/archive overflow-hidden rounded-xl border border-border/70 bg-card/45 shadow-[0_1px_0_hsl(var(--border)/0.2)] transition-colors hover:border-border"
+                    className="group/archive overflow-hidden rounded-lg border border-border/70 bg-card/45 shadow-[0_1px_0_hsl(var(--border)/0.2)] transition-colors hover:border-border"
                   >
                     <div className="flex items-center gap-2.5 px-2.5 py-2.5">
                       <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-border/60 bg-muted/45 text-muted-foreground">
@@ -565,8 +564,8 @@ export default function SidebarContent({
                               isProjectArchived: true,
                             })}
                           >
-                            <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md bg-background/70">
-                              <LLMProviderLogo provider={session.__provider} className="h-3.5 w-3.5" />
+                            <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md bg-background/70">
+                              <LLMProviderLogo provider={session.__provider} className="h-3 w-3" />
                             </span>
                             <div className="min-w-0 flex-1">
                               <p className="truncate text-xs text-foreground">
@@ -603,7 +602,7 @@ export default function SidebarContent({
               {groupedArchivedSessions.map((group) => (
                 <section
                   key={group.key}
-                  className="group/archive overflow-hidden rounded-xl border border-border/70 bg-card/45 shadow-[0_1px_0_hsl(var(--border)/0.2)] transition-colors hover:border-border"
+                  className="group/archive overflow-hidden rounded-lg border border-border/70 bg-card/45 shadow-[0_1px_0_hsl(var(--border)/0.2)] transition-colors hover:border-border"
                 >
                   <div className="flex items-center gap-2.5 px-2.5 py-2.5">
                     <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-border/60 bg-muted/45 text-muted-foreground">
@@ -635,8 +634,8 @@ export default function SidebarContent({
                           className="flex min-w-0 flex-1 items-center gap-2.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                           onClick={() => onArchivedSessionClick(session)}
                         >
-                          <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md bg-background/70">
-                            <LLMProviderLogo provider={session.provider} className="h-3.5 w-3.5" />
+                          <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md bg-background/70">
+                            <LLMProviderLogo provider={session.provider} className="h-3 w-3" />
                           </span>
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-xs text-foreground">
@@ -691,7 +690,6 @@ export default function SidebarContent({
           restartRequired={restartRequired}
           releaseInfo={releaseInfo}
           latestVersion={latestVersion}
-          currentVersion={currentVersion}
           onShowVersionModal={onShowVersionModal}
           onShowSettings={onShowSettings}
           t={t}

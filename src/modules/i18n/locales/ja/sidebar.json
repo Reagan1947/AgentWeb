@@ -20,7 +20,7 @@
     "runClaudeCli": "プロジェクトディレクトリでClaude CLIを実行して始めましょう"
   },
   "app": {
-    "title": "CloudCLI",
+    "title": "AgentWeb",
     "subtitle": "AIコーディングアシスタント"
   },
   "sessions": {
@@ -33,7 +33,7 @@
     "unnamed": "名称未設定",
     "loading": "読み込み中...",
     "showMore": "さらにセッションを表示",
-    "select": "選択",
+    "select": "セッション管理",
     "selectAll": "すべて選択",
     "selectAllLoaded": "読み込み済みをすべて選択",
     "clearSelection": "選択を解除",
@@ -72,7 +72,6 @@
     "save": "保存",
     "delete": "削除",
     "rename": "名前の変更",
-    "joinCommunity": "コミュニティに参加",
     "reportIssue": "問題を報告",
     "starOnGithub": "GitHubでスター"
   },

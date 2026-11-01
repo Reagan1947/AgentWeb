@@ -126,6 +126,7 @@
     "label": "Pengaturan",
     "agents": "Agen",
     "appearance": "Tampilan",
+    "commands": "Perintah",
     "git": "Git",
     "apiTokens": "API & Token",
     "voice": "Suara",
@@ -375,6 +376,9 @@
     }
   },
   "agents": {
+    "list": {
+      "description": "Pilih agen untuk mengelola akun, izin, dan alatnya."
+    },
     "authStatus": {
       "checking": "Memeriksa...",
       "connected": "Terhubung",

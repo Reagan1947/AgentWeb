@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FolderOpen } from 'lucide-react';
 
-import { Button, Input } from '@/shared/ui';
+import { FolderBoldIcon, InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@/shared/ui';
 import { browseFilesystemFolders } from '@/modules/project-creation-wizard/utils/workspaceApi';
 import { getSuggestionRootPath } from '@/modules/project-creation-wizard/utils/pathUtils';
 import type { FolderSuggestion } from '@/shared/types';
 import FolderBrowserModal from '@/modules/project-creation-wizard/FolderBrowserModal';
 
 type WorkspacePathFieldProps = {
+  id: string;
   value: string;
   disabled?: boolean;
   onChange: (path: string) => void;
@@ -17,6 +17,7 @@ type WorkspacePathFieldProps = {
 
 /** Rendered by StepConfiguration to enter the workspace path with folder autocompletion and a browse button. */
 export default function WorkspacePathField({
+  id,
   value,
   disabled = false,
   onChange,
@@ -84,43 +85,44 @@ export default function WorkspacePathField({
 
   return (
     <>
-      <div className="relative flex gap-2">
-        <div className="relative flex-1">
-          <Input
+      <div className="relative">
+        <InputGroup>
+          <InputGroupInput
+            id={id}
             type="text"
             value={value}
             onChange={(event) => onChange(event.target.value)}
             placeholder="/path/to/project/workspace"
-            className="w-full"
             disabled={disabled}
           />
+          <InputGroupAddon align="inline-end">
+            <InputGroupButton
+              aria-label="Choice Folder"
+              title={t('common:misc.browseFolders')}
+              onClick={() => setShowFolderBrowser(true)}
+              disabled={disabled}
+            >
+              <FolderBoldIcon className="size-4" />
+              Choice Folder
+            </InputGroupButton>
+          </InputGroupAddon>
+        </InputGroup>
 
-          {showPathDropdown && pathSuggestions.length > 0 && (
-            <div className="absolute z-10 mt-1 max-h-60 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800">
-              {pathSuggestions.map((suggestion) => (
-                <button
-                  key={suggestion.path}
-                  onClick={() => handleSuggestionSelect(suggestion)}
-                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
-                >
-                  <div className="font-medium text-gray-900 dark:text-white">{suggestion.name}</div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">{suggestion.path}</div>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => setShowFolderBrowser(true)}
-          className="px-3"
-          title={t('common:misc.browseFolders')}
-          disabled={disabled}
-        >
-          <FolderOpen className="h-4 w-4" />
-        </Button>
+        {showPathDropdown && pathSuggestions.length > 0 && (
+          <div className="absolute z-10 mt-1 max-h-60 w-full overflow-y-auto rounded-md border bg-popover text-popover-foreground shadow-md">
+            {pathSuggestions.map((suggestion) => (
+              <button
+                key={suggestion.path}
+                type="button"
+                onClick={() => handleSuggestionSelect(suggestion)}
+                className="w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+              >
+                <div className="font-medium">{suggestion.name}</div>
+                <div className="text-xs text-muted-foreground">{suggestion.path}</div>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <FolderBrowserModal

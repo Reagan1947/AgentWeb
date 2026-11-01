@@ -90,13 +90,13 @@ export function createUserRouter(service: ReturnType<typeof createUserService>):
     }
   });
 
-  // Queueing appends to the scope's queued message on the server, so the merge
-  // is made against what is stored rather than against a page's possibly stale
-  // copy of it.
+  // Queueing adds a turn on the server, after whatever is already stored,
+  // rather than against a page's possibly stale copy of the queue.
   router.post('/drafts/queued-message', (req, res, next) => {
     try {
-      const body = req.body as { scope?: unknown; queuedMessage?: unknown };
-      res.json(service.appendQueuedMessage(readUserId(req), body?.scope, body?.queuedMessage));
+      const body = req.body as { scope?: unknown; queuedMessage?: unknown; index?: unknown };
+      const index = typeof body?.index === 'number' && Number.isInteger(body.index) ? body.index : undefined;
+      res.json(service.appendQueuedMessage(readUserId(req), body?.scope, body?.queuedMessage, index));
     } catch (error) {
       next(error);
     }
@@ -104,8 +104,11 @@ export function createUserRouter(service: ReturnType<typeof createUserService>):
 
   router.delete('/drafts/queued-message', (req, res, next) => {
     try {
-      const body = req.body as { scope?: unknown };
-      res.json(service.clearQueuedMessage(readUserId(req), body?.scope));
+      const body = req.body as { scope?: unknown; id?: unknown };
+      const id = typeof body?.id === 'string' ? body.id : '';
+      res.json(id
+        ? service.removeQueuedMessage(readUserId(req), body?.scope, id)
+        : service.clearQueuedMessage(readUserId(req), body?.scope));
     } catch (error) {
       next(error);
     }

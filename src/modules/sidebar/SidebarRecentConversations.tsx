@@ -1,7 +1,8 @@
-import { Loader2, MessageSquare } from 'lucide-react';
+import { ArrowDown, Loader2, MessageSquare } from 'lucide-react';
 import type { MouseEvent } from 'react';
 import type { TFunction } from 'i18next';
 
+import { SELECTED_SESSION_ROW_CLASS } from '@/shared/constants';
 import { Button, LLMProviderLogo, Tooltip } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 import type { ProjectSession, RecentConversationListItem, SessionRowActions } from '@/shared/types';
@@ -37,7 +38,7 @@ function RecentConversationSkeleton() {
     <div className="space-y-1 px-1" aria-label="Loading recent conversations">
       {Array.from({ length: 8 }).map((_, index) => (
         <div key={index} className="flex items-center gap-2 rounded-lg px-2 py-2.5">
-          <div className="h-7 w-7 animate-pulse rounded-md bg-muted" />
+          <div className="h-6 w-6 animate-pulse rounded-md bg-muted" />
           <div className="min-w-0 flex-1 space-y-1.5">
             <div className="h-3 animate-pulse rounded bg-muted" style={{ width: `${72 - index * 3}%` }} />
             <div className="h-2.5 w-1/2 animate-pulse rounded bg-muted/70" />
@@ -97,15 +98,25 @@ export default function SidebarRecentConversations({
   }
 
   return (
-    <div className="px-1" data-testid="recent-conversations-list">
-      <div className="flex items-center justify-between px-2 pb-1.5 pt-0.5">
-        <span className="text-[11px] font-medium text-muted-foreground">
-          {t('recent.title', 'Recent conversations')}
-        </span>
-        <span className="text-[10px] tabular-nums text-muted-foreground/70">{total}</span>
+    <div className="space-y-2.5" data-testid="recent-conversations-list">
+      {/* Same inset as the archive header, so the title and count sit on the search field's edges. */}
+      <div className="pl-2 pr-0 md:-mr-1.5">
+        <div className="flex items-center justify-between px-1 pb-0.5 pt-0.5">
+          <div className="min-w-0">
+            <h2 className="text-xs font-medium leading-none text-foreground">
+              {t('recent.title', 'Recent conversations')}
+            </h2>
+            <p className="mt-1 text-[10px] leading-none text-muted-foreground">
+              {t('recent.activityHint', 'Newest activity across your workspaces')}
+            </p>
+          </div>
+          <span className="flex-shrink-0 rounded-full border border-border/60 bg-muted/40 px-2 py-0.5 text-[10px] tabular-nums text-muted-foreground">
+            {total}
+          </span>
+        </div>
       </div>
 
-      <div className="space-y-0.5">
+      <div className="space-y-0.5 px-1">
         {conversations.map((conversation) => {
           const isSelected = String(selectedSession?.id ?? '') === conversation.sessionId;
           const age = formatCompactAge(conversation.lastActivity, currentTime);
@@ -159,15 +170,15 @@ export default function SidebarRecentConversations({
                 className={cn(
                   'flex min-w-0 items-center gap-2 rounded-lg px-2 py-2 pr-11 text-left transition-colors',
                   isSelected
-                    ? 'bg-primary/10 text-foreground'
+                    ? SELECTED_SESSION_ROW_CLASS
                     : 'text-foreground hover:bg-accent/60',
                 )}
               >
                 <span className={cn(
-                  'flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md',
-                  isSelected ? 'bg-primary/10' : 'bg-muted/60',
+                  'flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md',
+                  isSelected ? 'bg-transparent' : 'bg-muted/60',
                 )}>
-                  <LLMProviderLogo provider={conversation.provider} className="h-3.5 w-3.5" />
+                  <LLMProviderLogo provider={conversation.provider} className="h-3 w-3" />
                 </span>
 
                 <span className="min-w-0 flex-1">
@@ -237,21 +248,27 @@ export default function SidebarRecentConversations({
             </div>
           );
         })}
-      </div>
 
-      {hasMore && (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="mt-1 h-8 w-full text-xs text-muted-foreground"
-          onClick={onLoadMore}
-          disabled={isLoadingMore}
-        >
-          {isLoadingMore
-            ? t('recent.loadingMore', 'Loading more...')
-            : t('recent.loadMore', 'Load older conversations')}
-        </Button>
-      )}
+        {hasMore && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="mt-1 h-8 w-full gap-1 text-xs text-muted-foreground [&_svg]:size-3.5"
+            onClick={onLoadMore}
+            disabled={isLoadingMore}
+          >
+            {isLoadingMore
+              ? t('recent.loadingMore', 'Loading more...')
+              : (
+                <>
+                  {t('recent.loadMore', 'Load older conversations')}
+                  {/* Ink, darker than the muted label, so the arrow matches the reference glyph. */}
+                  <ArrowDown className="text-foreground" aria-hidden="true" />
+                </>
+              )}
+          </Button>
+        )}
+      </div>
     </div>
   );
 }

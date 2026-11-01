@@ -20,7 +20,7 @@
     "runClaudeCli": "Запустите Claude CLI в каталоге проекта для начала работы"
   },
   "app": {
-    "title": "CloudCLI",
+    "title": "AgentWeb",
     "subtitle": "Интерфейс AI помощника для программирования"
   },
   "sessions": {
@@ -33,7 +33,7 @@
     "unnamed": "Без имени",
     "loading": "Загрузка...",
     "showMore": "Показать больше сеансов",
-    "select": "Выбрать",
+    "select": "Управление сессией",
     "selectAll": "Выбрать все",
     "selectAllLoaded": "Выбрать загруженные",
     "clearSelection": "Снять выделение",
@@ -76,7 +76,6 @@
     "save": "Сохранить",
     "delete": "Удалить",
     "rename": "Переименовать",
-    "joinCommunity": "Присоединиться к сообществу",
     "reportIssue": "Сообщить о проблеме",
     "starOnGithub": "Звезда на GitHub"
   },

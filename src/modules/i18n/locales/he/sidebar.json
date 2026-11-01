@@ -20,7 +20,7 @@
     "runClaudeCli": "כדי להתחיל, יש להריץ את Claude CLI בתיקיית פרויקט"
   },
   "app": {
-    "title": "CloudCLI",
+    "title": "AgentWeb",
     "subtitle": "ממשק לעוזר תכנות AI"
   },
   "sessions": {
@@ -33,7 +33,7 @@
     "unnamed": "ללא שם",
     "loading": "טוען...",
     "showMore": "הצגת סשנים נוספים",
-    "select": "בחירה",
+    "select": "ניהול סשן",
     "selectAll": "בחירת הכול",
     "selectAllLoaded": "בחירת כל הטעונים",
     "clearSelection": "ניקוי",
@@ -77,7 +77,6 @@
     "save": "שמירה",
     "delete": "מחיקה",
     "rename": "שינוי שם",
-    "joinCommunity": "הצטרפות לקהילה",
     "reportIssue": "דיווח על בעיה",
     "starOnGithub": "כוכב ב-GitHub"
   },
@@ -163,6 +162,7 @@
   },
   "recent": {
     "title": "שיחות אחרונות",
+    "activityHint": "הפעילות החדשה ביותר בכל סביבות העבודה",
     "emptyTitle": "עדיין אין שיחות",
     "emptyDescription": "השיחות שעודכנו לאחרונה יופיעו כאן.",
     "loadFailed": "לא ניתן לטעון שיחות אחרונות",
@@ -173,6 +173,7 @@
     "title": "פועלים עכשיו",
     "emptyTitle": "אין סשנים פועלים",
     "emptyDescription": "עבודה פעילה תופיע כאן בזמן שספק מעבד בקשה.",
+    "activeHint": "סשנים שספק מעבד כרגע",
     "noMatchingSessions": "אין סשנים פועלים שתואמים לחיפוש."
   },
   "archived": {

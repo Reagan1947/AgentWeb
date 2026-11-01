@@ -257,3 +257,80 @@ describe('search jump ownership', () => {
     );
   });
 });
+
+describe('jump-to-bottom button', () => {
+  function stubReducedMotion(reduce: boolean) {
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: reduce && query.includes('prefers-reduced-motion'),
+      media: query,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+      addListener: () => undefined,
+      removeListener: () => undefined,
+      dispatchEvent: () => false,
+    }));
+  }
+
+  async function mountAwayFromBottom() {
+    const messages = new Map<string, NormalizedMessage[]>([
+      [SESSION_A, [buildMessage(0, '2026-01-01T00:00:00.000Z')]],
+    ]);
+    const store = createStore(messages);
+    const { result } = await renderChatSessionState({
+      session: { id: SESSION_A } as ProjectSession,
+      store,
+    });
+    const container = createContainer(5000, 500);
+    container.element.scrollTop = 0;
+    const scrollTo = vi.fn();
+    container.element.scrollTo = scrollTo;
+    (result.current.scrollContainerRef as { current: HTMLDivElement | null }).current = container.element;
+    container.writes.length = 0;
+    return { result, container, scrollTo };
+  }
+
+  it('glides to the bottom instead of jumping', async () => {
+    stubReducedMotion(false);
+    const frames: FrameRequestCallback[] = [];
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      frames.push(callback);
+      return frames.length;
+    });
+    const { result, container } = await mountAwayFromBottom();
+    const framesBeforeClick = frames.length;
+
+    act(() => {
+      result.current.scrollToBottomAndReset();
+    });
+
+    const step = frames.at(-1);
+    assert.ok(step, 'the button arms a glide frame');
+    assert.ok(frames.length > framesBeforeClick);
+    assert.deepEqual(container.writes, [], 'the button must not assign scrollTop before the first frame');
+
+    const startedAt = performance.now();
+    act(() => {
+      step(startedAt + 190);
+    });
+    const mid = container.element.scrollTop;
+    assert.ok(mid > 0 && mid < container.scrollHeight - container.element.clientHeight, `mid-glide should sit between the ends, got ${mid}`);
+
+    act(() => {
+      step(startedAt + 380);
+    });
+    expect(container.writes.at(-1)).toBe(container.scrollHeight);
+    expect(result.current.isUserScrolledUp).toBe(false);
+  });
+
+  it('jumps immediately when the reader prefers reduced motion', async () => {
+    stubReducedMotion(true);
+    const { result, container, scrollTo } = await mountAwayFromBottom();
+
+    act(() => {
+      result.current.scrollToBottomAndReset();
+    });
+
+    expect(scrollTo).not.toHaveBeenCalled();
+    expect(container.writes).toContain(container.scrollHeight);
+  });
+});

@@ -17,7 +17,7 @@ type AgentCategoryContentSectionProps = {
   projects: AgentSettingsProject[];
 };
 
-/** Rendered by AgentsSettingsTab to show the panel for the selected provider and category. */
+/** Rendered by AgentSettingsLayer to show the panel for the open provider and category. */
 export default function AgentCategoryContentSection({
   selectedAgent,
   selectedCategory,
@@ -31,7 +31,7 @@ export default function AgentCategoryContentSection({
   projects,
 }: AgentCategoryContentSectionProps) {
   return (
-    <div className="min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-3 md:p-4">
+    <div className="min-w-0">
       {selectedCategory === 'account' && (
         <AccountContent
           agent={selectedAgent}

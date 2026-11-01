@@ -40,6 +40,25 @@ export const getParentPath = (currentPath: string): string | null => {
   return currentPath.slice(0, lastSeparatorIndex);
 };
 
+/**
+ * Walks from the filesystem root down to `folderPath`.
+ * The folder tree expands this chain so the starting directory is already visible.
+ */
+export const listAncestorPaths = (folderPath: string): string[] => {
+  const trimmedPath = folderPath.trim();
+  if (!trimmedPath || trimmedPath === '~') {
+    return ['~'];
+  }
+
+  const ancestors: string[] = [];
+  let currentPath: string | null = trimmedPath;
+  while (currentPath) {
+    ancestors.unshift(currentPath);
+    currentPath = getParentPath(currentPath);
+  }
+  return ancestors;
+};
+
 export const joinFolderPath = (basePath: string, folderName: string): string => {
   const normalizedBasePath = basePath.trim().replace(/[\\/]+$/, '');
   const separator =

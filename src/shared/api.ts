@@ -537,10 +537,16 @@ export const api = {
     // message is left as it is.
     saveDraft: (scope: string, draft: { text: string; queuedMessage?: unknown }) =>
       put('/api/user/drafts', { scope, ...draft }),
-    // Appends to the scope's queued message on the server and returns the
-    // message that is now queued.
-    appendQueuedMessage: (scope: string, queuedMessage: unknown) =>
-      post('/api/user/drafts/queued-message', { scope, queuedMessage }),
+    // Adds one turn to the scope's queue on the server. `index` inserts it at
+    // that position; otherwise it waits behind whatever is already queued.
+    appendQueuedMessage: (scope: string, queuedMessage: unknown, index?: number) =>
+      post('/api/user/drafts/queued-message', {
+        scope,
+        queuedMessage,
+        ...(typeof index === 'number' ? { index } : {}),
+      }),
+    removeQueuedMessage: (scope: string, id: string) =>
+      del('/api/user/drafts/queued-message', { scope, id }),
     clearQueuedMessage: (scope: string) => del('/api/user/drafts/queued-message', { scope }),
   },
 

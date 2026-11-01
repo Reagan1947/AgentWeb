@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { readQueuedChatMessage } from '@/shared/utils.js';
+import { readQueuedChatMessage, readQueuedChatMessages } from '@/shared/utils.js';
 
 test('a stored queued message is read with its text, options and attachments', () => {
   assert.deepEqual(
@@ -25,4 +25,20 @@ test('a message with nothing to send reads as absent', () => {
   assert.equal(readQueuedChatMessage({ content: '  ', attachments: [] }), null);
   assert.equal(readQueuedChatMessage(null), null);
   assert.equal(readQueuedChatMessage(['A']), null);
+});
+
+test('a queue is an ordered list, and a legacy single message is a one-entry queue', () => {
+  assert.deepEqual(readQueuedChatMessages([
+    { id: 'a', content: 'A', attachments: [] },
+    { content: '  ', attachments: [] },
+    { id: 'b', content: 'B', options: { model: 'opus' }, attachments: [{ name: 'b.txt' }] },
+  ]), [
+    { id: 'a', content: 'A', attachments: [] },
+    { id: 'b', content: 'B', options: { model: 'opus' }, attachments: [{ name: 'b.txt' }] },
+  ]);
+  assert.deepEqual(
+    readQueuedChatMessages({ content: 'only', attachments: [] }),
+    [{ content: 'only', attachments: [] }],
+  );
+  assert.deepEqual(readQueuedChatMessages(null), []);
 });

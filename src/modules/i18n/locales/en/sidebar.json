@@ -20,7 +20,7 @@
     "runClaudeCli": "Run Claude CLI in a project directory to get started"
   },
   "app": {
-    "title": "CloudCLI",
+    "title": "AgentWeb",
     "subtitle": "AI coding assistant interface"
   },
   "sessions": {
@@ -33,7 +33,7 @@
     "unnamed": "Unnamed",
     "loading": "Loading...",
     "showMore": "Show more sessions",
-    "select": "Select",
+    "select": "Management Session",
     "selectAll": "Select all",
     "selectAllLoaded": "Select all loaded",
     "clearSelection": "Clear",
@@ -76,7 +76,6 @@
     "save": "Save",
     "delete": "Delete",
     "rename": "Rename",
-    "joinCommunity": "Join Community",
     "reportIssue": "Report Issue",
     "starOnGithub": "Star on GitHub"
   },
@@ -149,6 +148,7 @@
   },
   "recent": {
     "title": "Recent conversations",
+    "activityHint": "Newest activity across your workspaces",
     "emptyTitle": "No conversations yet",
     "emptyDescription": "Your most recently updated conversations will appear here.",
     "loadFailed": "Could not load recent conversations",

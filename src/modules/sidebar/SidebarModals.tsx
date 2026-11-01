@@ -12,6 +12,7 @@ import { ProjectCreationWizard } from '@/modules/project-creation-wizard';
 
 type SidebarModalsProps = {
   projects: Project[];
+  selectedProject: Project | null;
   showSettings: boolean;
   settingsInitialTab: string;
   onCloseSettings: () => void;
@@ -38,6 +39,7 @@ type TypedSettingsProps = {
   onClose: () => void;
   projects: SettingsProject[];
   initialTab: string;
+  selectedProject: Project | null;
 };
 
 const SettingsComponent = Settings as (props: TypedSettingsProps) => JSX.Element;
@@ -49,6 +51,7 @@ function TypedSettings(props: TypedSettingsProps) {
 /** Rendered by Sidebar to host its settings, new-project, delete-confirmation and version modals in one place. */
 export default function SidebarModals({
   projects,
+  selectedProject,
   showSettings,
   settingsInitialTab,
   onCloseSettings,
@@ -92,13 +95,14 @@ export default function SidebarModals({
             onClose={onCloseSettings}
             projects={settingsProjects}
             initialTab={settingsInitialTab}
+            selectedProject={selectedProject}
           />,
           document.body,
         )}
 
       {pendingDeletion?.kind === 'project' &&
         ReactDOM.createPortal(
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center modal-backdrop p-4">
             <div className="w-full max-w-md overflow-hidden rounded-xl border border-border bg-card shadow-2xl">
               <div className="p-6">
                 <div className="flex items-start gap-4">
@@ -152,7 +156,7 @@ export default function SidebarModals({
 
       {pendingDeletion?.kind === 'session' &&
         ReactDOM.createPortal(
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center modal-backdrop p-4">
             <div className="w-full max-w-md overflow-hidden rounded-xl border border-border bg-card shadow-2xl">
               <div className="p-6">
                 <div className="flex items-start gap-4">
@@ -208,7 +212,7 @@ export default function SidebarModals({
 
       {pendingDeletion?.kind === 'sessions' &&
         ReactDOM.createPortal(
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center modal-backdrop p-4">
             <div className="w-full max-w-md overflow-hidden rounded-xl border border-border bg-card shadow-2xl">
               <div className="p-6">
                 <div className="flex items-start gap-4">

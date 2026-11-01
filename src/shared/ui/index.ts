@@ -9,9 +9,9 @@
  * the clearest use for it. The two-module rule is a bar for admission, not a
  * trigger for eviction.
  *
- * shadcn/ui primitives (dropdown-menu, popover, select, sheet, input-group,
- * attachment, and the other files added from the new-york registry) are
- * exported below. The chat composer uses InputGroup and Attachment as the
+ * shadcn/ui primitives (alert-dialog, dropdown-menu, popover, select, sheet,
+ * input-group, attachment, and the other files added from the new-york
+ * registry) are exported below. The chat composer uses InputGroup and Attachment as the
  * visual shell of its prompt field. Message, Bubble, Message Scroller, Trace,
  * Code Block and Marker are the AI transcript shells, adapted to this app's
  * Tailwind 3 tokens. Button, Dialog, Input, Tooltip and the other PascalCase
@@ -54,12 +54,23 @@ export {
 export { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/shared/ui/Card';
 export { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/shared/ui/Collapsible';
 export { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from '@/shared/ui/Command';
-export { DarkModeToggle } from '@/shared/ui/DarkModeToggle';
 export { Dialog, DialogTrigger, DialogContent, DialogTitle } from '@/shared/ui/Dialog';
+export {
+  AlertDialog,
+  AlertDialogPortal,
+  AlertDialogOverlay,
+  AlertDialogTrigger,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from '@/shared/ui/alert-dialog';
 export { Marker, MarkerContent, MarkerIcon } from '@/shared/ui/marker';
 export {
   Message,
-  MessageAvatar,
   MessageContent,
   MessageFooter,
   MessageGroup,
@@ -67,12 +78,12 @@ export {
 } from '@/shared/ui/message';
 export {
   MessageScroller,
-  MessageScrollerButton,
   MessageScrollerContent,
   MessageScrollerItem,
   MessageScrollerProvider,
   MessageScrollerViewport,
 } from '@/shared/ui/message-scroller';
+export { FolderBoldIcon, FolderNotchOpenBoldIcon } from '@/shared/ui/FolderIcons';
 export { Input } from '@/shared/ui/Input';
 export {
   InputGroup,
@@ -104,6 +115,18 @@ export {
   DropdownMenuSubTrigger,
   DropdownMenuRadioGroup,
 } from '@/shared/ui/dropdown-menu';
+export {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  FieldLegend,
+  FieldSeparator,
+  FieldSet,
+  FieldTitle,
+} from '@/shared/ui/field';
 export { Label } from '@/shared/ui/label';
 export { Popover, PopoverTrigger, PopoverContent, PopoverAnchor } from '@/shared/ui/popover';
 export {

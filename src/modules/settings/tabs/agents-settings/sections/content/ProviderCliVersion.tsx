@@ -9,8 +9,6 @@ type ProviderCliVersionProps = {
   agent: AgentProvider;
   /** From the auth status, shown until the CLI status request answers. */
   installedVersion: string | null;
-  textClass: string;
-  subtextClass: string;
 };
 
 type UpdateResultProps = {
@@ -74,7 +72,7 @@ function UpdateResult({ result, latestVersion }: UpdateResultProps) {
  * the CLI's own updater on the server. Keyed by agent there, so each agent's
  * row has its own request state.
  */
-export default function ProviderCliVersion({ agent, installedVersion, textClass, subtextClass }: ProviderCliVersionProps) {
+export default function ProviderCliVersion({ agent, installedVersion }: ProviderCliVersionProps) {
   const { t } = useTranslation('settings');
   const { status, statusFailed, updating, updateResult, updateError, runUpdate } = useProviderCliVersion(agent);
 
@@ -121,12 +119,12 @@ export default function ProviderCliVersion({ agent, installedVersion, textClass,
   }
 
   return (
-    <div className="border-t border-border/50 pt-4" data-testid="provider-cli-version">
+    <div className="px-4 py-4" data-testid="provider-cli-version">
       {/* The minimum width wraps the button under the version on phones instead of squeezing it. */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-48 flex-1">
-          <div className={`font-medium ${textClass}`}>{t('agents.cli.title')}</div>
-          <div className={`flex flex-wrap items-center gap-x-2 gap-y-1 text-sm ${subtextClass}`}>
+          <div className="text-sm font-medium text-foreground">{t('agents.cli.title')}</div>
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
             <span className="break-all">{versionText}</span>
             {detail && status?.updateAvailable ? (
               <Badge

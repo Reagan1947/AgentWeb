@@ -98,7 +98,7 @@ type SidebarProjectItemProps = {
   t: TFunction;
 };
 
-/** Rendered by SidebarProjectList for one project row. Collapsible expands the sessions; a right-click or the hover "…" button opens rename, select, and delete, and Button and Input are the remaining row actions and the rename field. */
+/** Rendered by SidebarProjectList for one project row. Collapsible expands the sessions; a right-click or the hover "…" button opens manage sessions, rename, and delete, and Button and Input are the remaining row actions and the rename field. */
 function SidebarProjectItem({
   project,
   selectedProject,
@@ -298,7 +298,8 @@ function SidebarProjectItem({
             isStarred
               // Ghost hover/active recolors the icon to the accent foreground, so a
               // click stays black until the pointer leaves unless yellow is restated.
-              ? 'text-yellow-600 hover:bg-yellow-50 hover:text-yellow-600 active:bg-yellow-50 active:text-yellow-600 dark:text-yellow-400 dark:hover:bg-yellow-900/20 dark:hover:text-yellow-400 dark:active:bg-yellow-900/20 dark:active:text-yellow-400'
+              // The hover fill stays the same accent as the other row actions.
+              ? 'text-yellow-600 hover:bg-accent hover:text-yellow-600 active:bg-accent active:text-yellow-600 dark:text-yellow-400 dark:hover:text-yellow-400 dark:active:text-yellow-400'
               : PROJECT_ROW_ACTION_CLASS,
           )}
           onClick={toggleStarProject}
@@ -309,7 +310,7 @@ function SidebarProjectItem({
     );
   };
 
-  // Select lives in the menu the "…" button and a right-click both open.
+  // Management Session lives in the menu the "…" button and a right-click both open.
   // Touch rows keep the icons visible; a pointer row reveals them on hover.
   // A starred row keeps its container up so the yellow star does not leave with the pointer.
   const rowActionsClass = (compact: boolean) => cn(
@@ -331,16 +332,17 @@ function SidebarProjectItem({
           disabled={isEditing}
           label={project.displayName}
           ariaLabel={project.displayName}
-          menuClassName="w-[280px] rounded-xl p-1.5 shadow-xl"
+          compact
+          menuClassName="w-[280px] rounded-xl p-1 shadow-xl"
           header={(
-            <div className="mb-1 border-b border-border px-3 py-2">
-              <p className="truncate text-xs font-medium text-foreground" title={project.displayName}>
+            <div className="mb-1 border-b border-border px-2.5 py-1.5">
+              <p className="truncate text-[11px] font-medium leading-4 text-foreground" title={project.displayName}>
                 {project.displayName}
               </p>
-              <p className="mt-0.5 text-[11px] text-muted-foreground">
+              <p className="mt-0.5 text-[10px] leading-3 text-muted-foreground">
                 {t('deleteConfirmation.sessionCount', { count: totalSessionCount })}
               </p>
-              <p className="mt-0.5 break-all text-[11px] leading-4 text-muted-foreground">
+              <p className="mt-0.5 break-all text-[9px] leading-3 text-muted-foreground">
                 {project.fullPath}
               </p>
             </div>
@@ -431,7 +433,7 @@ function SidebarProjectItem({
         {/* Starring only fills the star. The row keeps the same background and hover as every other project. */}
         {!isCompact && (
         <div className="relative isolate flex w-full items-center bg-background font-normal">
-          {/* The row fill stays square so a sticky header still masks sessions scrolling underneath. Hover uses the same fill as a selected session. The fill sits on a lower layer so it does not cover the icon or name. */}
+          {/* The row fill stays square so a sticky header still masks sessions scrolling underneath. Hover stays the neutral accent; the open session uses the blue fill. The fill sits on a lower layer so it does not cover the icon or name. */}
           <div
             aria-hidden
             className="pointer-events-none absolute inset-0 -z-10 rounded-md transition-colors group-hover:bg-accent"

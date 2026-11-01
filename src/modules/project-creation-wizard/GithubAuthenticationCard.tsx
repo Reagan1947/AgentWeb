@@ -1,7 +1,18 @@
 import { Key, Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import { Input } from '@/shared/ui';
+import {
+  Field,
+  FieldDescription,
+  FieldLabel,
+  InputGroup,
+  InputGroupInput,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/shared/ui';
 import type { GithubTokenCredential, TokenMode } from '@/shared/types';
 
 type GithubAuthenticationCardProps = {
@@ -92,39 +103,40 @@ export default function GithubAuthenticationCard({
           </div>
 
           {tokenMode === 'stored' ? (
-            <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                {t('projectWizard.step2.selectToken')}
-              </label>
-              <select
-                value={selectedGithubToken}
-                onChange={(event) => onSelectedGithubTokenChange(event.target.value)}
-                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800"
+            <Field>
+              <FieldLabel>{t('projectWizard.step2.selectToken')}</FieldLabel>
+              <Select
+                value={selectedGithubToken || undefined}
+                onValueChange={onSelectedGithubTokenChange}
               >
-                <option value="">{t('projectWizard.step2.selectTokenPlaceholder')}</option>
-                {availableTokens.map((token) => (
-                  <option key={token.id} value={String(token.id)}>
-                    {token.credential_name}
-                  </option>
-                ))}
-              </select>
-            </div>
+                <SelectTrigger className="h-9 bg-transparent shadow-sm focus:ring-1 focus:ring-ring dark:bg-input/30">
+                  <SelectValue placeholder={t('projectWizard.step2.selectTokenPlaceholder')} />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableTokens.map((token) => (
+                    <SelectItem key={token.id} value={String(token.id)}>
+                      {token.credential_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
           ) : tokenMode === 'new' ? (
-            <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+            <Field>
+              <FieldLabel htmlFor="project-github-token">
                 {t('projectWizard.step2.newToken')}
-              </label>
-              <Input
-                type="password"
-                value={newGithubToken}
-                onChange={(event) => onNewGithubTokenChange(event.target.value)}
-                placeholder="ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                className="w-full"
-              />
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                {t('projectWizard.step2.tokenHelp')}
-              </p>
-            </div>
+              </FieldLabel>
+              <InputGroup>
+                <InputGroupInput
+                  id="project-github-token"
+                  type="password"
+                  value={newGithubToken}
+                  onChange={(event) => onNewGithubTokenChange(event.target.value)}
+                  placeholder="ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                />
+              </InputGroup>
+              <FieldDescription>{t('projectWizard.step2.tokenHelp')}</FieldDescription>
+            </Field>
           ) : null}
         </>
       )}
@@ -137,25 +149,25 @@ export default function GithubAuthenticationCard({
             </p>
           </div>
 
-          <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+          <Field>
+            <FieldLabel htmlFor="project-github-token-public">
               {t('projectWizard.step2.optionalTokenPublic')}
-            </label>
-            <Input
-              type="password"
-              value={newGithubToken}
-              onChange={(event) => {
-                const tokenValue = event.target.value;
-                onNewGithubTokenChange(tokenValue);
-                onTokenModeChange(tokenValue.trim() ? 'new' : 'none');
-              }}
-              placeholder={t('projectWizard.step2.tokenPublicPlaceholder')}
-              className="w-full"
-            />
-            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              {t('projectWizard.step2.noTokensHelp')}
-            </p>
-          </div>
+            </FieldLabel>
+            <InputGroup>
+              <InputGroupInput
+                id="project-github-token-public"
+                type="password"
+                value={newGithubToken}
+                onChange={(event) => {
+                  const tokenValue = event.target.value;
+                  onNewGithubTokenChange(tokenValue);
+                  onTokenModeChange(tokenValue.trim() ? 'new' : 'none');
+                }}
+                placeholder={t('projectWizard.step2.tokenPublicPlaceholder')}
+              />
+            </InputGroup>
+            <FieldDescription>{t('projectWizard.step2.noTokensHelp')}</FieldDescription>
+          </Field>
         </div>
       )}
     </div>

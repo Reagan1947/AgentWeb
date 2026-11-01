@@ -138,6 +138,9 @@
     "placeholderDefault": "Type your message...",
     "disabled": "Input disabled",
     "attachFiles": "Attach files",
+    "toolsMenu": "Attach files or show commands",
+    "searchCommands": "Search commands",
+    "noMatchingCommands": "No commands available",
     "attachImages": "Attach images",
     "send": "Send",
     "stop": "Stop",
@@ -158,7 +161,11 @@
       "label": "Queued",
       "willSend": "Will send when this finishes",
       "edit": "Edit queued message",
-      "delete": "Delete queued message"
+      "delete": "Delete queued message",
+      "steer": "Steer",
+      "editing": "Editing",
+      "collapse": "Collapse queue",
+      "expand": "Expand queue"
     }
   },
   "composer": {

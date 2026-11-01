@@ -109,6 +109,7 @@
     "label": "Einstellungen",
     "agents": "Agenten",
     "appearance": "Darstellung",
+    "commands": "Befehle",
     "git": "Git",
     "apiTokens": "API & Token",
     "tasks": "Aufgaben",
@@ -332,6 +333,9 @@
     }
   },
   "agents": {
+    "list": {
+      "description": "Wählen Sie einen Agenten, um Konto, Berechtigungen und Werkzeuge zu verwalten."
+    },
     "authStatus": {
       "checking": "Wird überprüft...",
       "connected": "Verbunden",

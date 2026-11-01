@@ -1,7 +1,7 @@
-import { FileText } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { useClaudeSettingsPermissionRules } from '@/modules/settings/hooks/useClaudeSettingsPermissionRules';
+import SettingsSection from '@/modules/settings/SettingsSection';
 import type { ClaudeSettingsPermissionSource } from '@/shared/types';
 
 const RULE_GROUPS = [
@@ -62,29 +62,28 @@ export default function ClaudeSettingsFileRules() {
   const visibleSources = (sources ?? []).filter((source) => source.scope === 'user' || source.status !== 'missing');
 
   return (
-    <div className="space-y-4" data-testid="claude-settings-file-rules">
-      <div className="flex items-center gap-3">
-        <FileText className="h-5 w-5 text-blue-500" />
-        <h3 className="text-lg font-medium text-foreground">{t('permissions.settingsFiles.title')}</h3>
-      </div>
-      <p className="text-sm text-muted-foreground">{t('permissions.settingsFiles.description')}</p>
+    <div data-testid="claude-settings-file-rules">
+      <SettingsSection
+        title={t('permissions.settingsFiles.title')}
+        description={t('permissions.settingsFiles.description')}
+      >
+        {loadFailed && (
+          <p className="text-sm text-amber-700 dark:text-amber-300">{t('permissions.settingsFiles.loadFailed')}</p>
+        )}
+        {!loadFailed && sources === null && (
+          <p className="text-sm text-muted-foreground">{t('permissions.settingsFiles.loading')}</p>
+        )}
 
-      {loadFailed && (
-        <p className="text-sm text-amber-700 dark:text-amber-300">{t('permissions.settingsFiles.loadFailed')}</p>
-      )}
-      {!loadFailed && sources === null && (
-        <p className="text-sm text-muted-foreground">{t('permissions.settingsFiles.loading')}</p>
-      )}
+        {visibleSources.length > 0 && (
+          <div className="space-y-2">
+            {visibleSources.map((source) => (
+              <SettingsFileCard key={source.scope} source={source} />
+            ))}
+          </div>
+        )}
 
-      {visibleSources.length > 0 && (
-        <div className="space-y-2">
-          {visibleSources.map((source) => (
-            <SettingsFileCard key={source.scope} source={source} />
-          ))}
-        </div>
-      )}
-
-      <p className="text-xs text-muted-foreground">{t('permissions.settingsFiles.projectNote')}</p>
+        <p className="text-xs text-muted-foreground">{t('permissions.settingsFiles.projectNote')}</p>
+      </SettingsSection>
     </div>
   );
 }

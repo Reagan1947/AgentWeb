@@ -8,12 +8,10 @@ import { ToolRenderer, ToolErrorDisplay, SubagentPanel, WorkflowPanel, shouldHid
 import {
   Bubble,
   BubbleContent,
-  LLMProviderLogo,
   Marker,
   MarkerContent,
   MarkerIcon,
   Message,
-  MessageAvatar,
   MessageContent,
   MessageFooter,
   MessageHeader,
@@ -115,11 +113,6 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
           align="end"
           className="group w-full sm:w-auto sm:max-w-[85%] md:max-w-md lg:max-w-lg xl:max-w-xl"
         >
-          {!isGrouped && (
-            <MessageAvatar className="hidden bg-blue-600 text-sm text-white sm:flex">
-              U
-            </MessageAvatar>
-          )}
           <MessageContent className="items-end gap-2">
             {message.images && message.images.length > 0 && (
               <ChatMessageImages
@@ -216,25 +209,6 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
       ) : (
         /* Claude/Error/Tool messages on the left */
         <Message className="w-full">
-          {!isGrouped && (
-            <MessageAvatar
-              className={
-                message.type === 'error'
-                  ? 'bg-red-600 text-sm text-white'
-                  : message.type === 'tool'
-                    ? 'bg-gray-600 text-sm text-white dark:bg-gray-700'
-                    : 'bg-transparent p-1 text-foreground'
-              }
-            >
-              {message.type === 'error' ? (
-                '!'
-              ) : message.type === 'tool' ? (
-                '🔧'
-              ) : (
-                <LLMProviderLogo provider={provider} className="h-full w-full" />
-              )}
-            </MessageAvatar>
-          )}
           <MessageContent>
             {!isGrouped && (
               <MessageHeader>

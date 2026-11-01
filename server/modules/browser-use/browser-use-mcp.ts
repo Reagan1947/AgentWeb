@@ -71,7 +71,7 @@ const sessionIdSchema = {
 const tools: ToolDefinition[] = [
   {
     name: 'browser_create_session',
-    description: 'Create a temporary Browser session that the agent can control. Optionally provide a background profileName to reuse cookies and storage.',
+    description: 'Create a temporary Browser session that the agent can control. The user watches the same session in the Browser tab. Optionally provide a background profileName to reuse cookies and storage on the local browser.',
     inputSchema: {
       type: 'object',
       properties: {

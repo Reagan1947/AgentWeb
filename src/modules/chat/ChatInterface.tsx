@@ -159,7 +159,7 @@ function ChatInterface({
     scrollContainerRef,
     scrollToBottom,
     scrollToBottomAndReset,
-    handleScroll,
+    handleUnscrollablePaneGesture,
     requestLatestMessages,
   } = useChatSessionState({
     isActive,
@@ -192,6 +192,7 @@ function ChatInterface({
     textareaRef,
     inputHighlightRef,
     isTextareaExpanded,
+    slashCommands,
     slashCommandsCount,
     filteredCommands,
     frequentCommands,
@@ -200,7 +201,6 @@ function ChatInterface({
     selectedCommandIndex,
     resetCommandMenuState,
     handleCommandSelect,
-    handleToggleCommandMenu,
     showFileDropdown,
     filteredFiles,
     selectedFileIndex,
@@ -216,9 +216,12 @@ function ChatInterface({
     handleSubmit,
     backgroundSendPrompt,
     resolveBackgroundSendPrompt,
-    queuedDraft,
+    queuedDrafts,
+    isEditingQueuedDraft,
     editQueuedDraft,
     deleteQueuedDraft,
+    steerQueuedDraft,
+    cancelQueuedEdit,
     handleVoiceTranscript,
     handleInputChange,
     handleKeyDown,
@@ -226,12 +229,9 @@ function ChatInterface({
     handleTextareaClick,
     handleTextareaInput,
     syncInputOverlayScroll,
-    handleClearInput,
     handleAbortSession,
     handlePermissionDecision,
     handleGrantToolPermission,
-    handleInputFocusChange,
-    isInputFocused,
     commandModalPayload,
     closeCommandModal,
     showCostModal,
@@ -303,7 +303,7 @@ function ChatInterface({
     sessionStore,
   });
 
-  // Lets other modules (the quick settings Commands tab) hand text to the
+  // Lets other modules (the settings Commands tab) hand text to the
   // composer: append it after a separating space, then focus the textarea with
   // the caret at the end once React has rendered the new value.
   const insertComposerText = useCallback((text: string) => {
@@ -424,11 +424,6 @@ function ChatInterface({
     }
   }, [currentSessionId, provider, selectProviderEffort, selectedSession?.id]);
 
-  // Mirrors ChatComposer's own visibility check so the message pane can
-  // reserve enough bottom space to keep the floating status tab from
-  // overlapping the last message.
-  const hasActivityIndicator = Boolean(sessionActivity && pendingPermissionRequests.length === 0);
-
   const selectedProviderLabel =
     provider === 'cursor'
       ? t('messageTypes.cursor')
@@ -466,11 +461,12 @@ function ChatInterface({
               // hidden while more pages exist — so a short transcript is often not
               // scrollable at all and never emits `scroll`. Wheel and touch are
               // then the only way to reach the top pager or the "load all" overlay.
-              onWheel={handleScroll}
-              onTouchMove={handleScroll}
+              // Once the pane does scroll, these return immediately so a mobile
+              // drag is not measuring layout on every move.
+              onWheel={handleUnscrollablePaneGesture}
+              onTouchMove={handleUnscrollablePaneGesture}
               isLoadingSessionMessages={isLoadingSessionMessages}
               isProcessing={isProcessing}
-              hasActivityIndicator={hasActivityIndicator}
               chatMessages={chatMessages}
               selectedSession={selectedSession}
               currentSessionId={currentSessionId}
@@ -559,16 +555,17 @@ function ChatInterface({
           onScheduleMessage={handleScheduleMessage}
           onCancelScheduledMessage={cancelScheduledMessage}
           slashCommandsCount={slashCommandsCount}
-          onToggleCommandMenu={handleToggleCommandMenu}
-          hasInput={Boolean(input.trim())}
-          onClearInput={handleClearInput}
+          slashCommands={slashCommands}
           onSubmit={handleSubmit}
           isDragActive={isDragActive}
-          queuedDraft={queuedDraft}
+          queuedDrafts={queuedDrafts}
           backgroundSendPrompt={backgroundSendPrompt}
           onResolveBackgroundSendPrompt={resolveBackgroundSendPrompt}
+          onSteerQueuedDraft={steerQueuedDraft}
           onEditQueuedDraft={editQueuedDraft}
           onDeleteQueuedDraft={deleteQueuedDraft}
+          isEditingQueuedDraft={isEditingQueuedDraft}
+          onCancelQueuedEdit={cancelQueuedEdit}
           attachedFiles={attachedFiles}
           onRemoveAttachment={(index) =>
             setAttachedFiles((previous) =>
@@ -600,11 +597,8 @@ function ChatInterface({
           onTextareaPaste={handlePaste}
           onTextareaScrollSync={syncInputOverlayScroll}
           onTextareaInput={handleTextareaInput}
-          isInputFocused={isInputFocused}
-          onInputFocusChange={handleInputFocusChange}
           placeholder={t('input.placeholder', { provider: selectedProviderLabel })}
           isTextareaExpanded={isTextareaExpanded}
-          sendByCtrlEnter={sendByCtrlEnter}
         />
         </div>
       </div>

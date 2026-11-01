@@ -1,11 +1,11 @@
 import { MessageSquare, Terminal, Folder, GitBranch, ClipboardCheck, MonitorPlay, type LucideIcon } from 'lucide-react';
 import { Fragment } from 'react';
-import type { Dispatch, KeyboardEvent, SetStateAction } from 'react';
+import type { Dispatch, SetStateAction } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Tooltip, PillBar, Pill } from '@/shared/ui';
+import { Tooltip, Tabs, TabsList, TabsTrigger } from '@/shared/ui';
 import type { AppTab } from '@/shared/types';
-import { usePlugins,PluginIcon } from '@/modules/plugins';
+import { usePlugins, PluginIcon } from '@/modules/plugins';
 
 type WorkspaceTabsProps = {
   activeTab: AppTab;
@@ -80,68 +80,49 @@ export default function WorkspaceTabs({
 
   const tabs: TabDefinition[] = [...builtInTabs, ...pluginTabs];
 
-  const handleTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
-    const tabList = event.currentTarget.closest('[role="tablist"]');
-    if (!tabList) return;
-
-    const tabButtons = Array.from(tabList.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
-    const currentIndex = tabButtons.indexOf(event.currentTarget);
-    let nextIndex: number;
-
-    if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % tabButtons.length;
-    else if (event.key === 'ArrowLeft') nextIndex = (currentIndex - 1 + tabButtons.length) % tabButtons.length;
-    else if (event.key === 'Home') nextIndex = 0;
-    else if (event.key === 'End') nextIndex = tabButtons.length - 1;
-    else return;
-
-    event.preventDefault();
-    tabButtons[nextIndex]?.focus();
-    tabButtons[nextIndex]?.click();
+  const selectTab = (value: string) => {
+    const nextTab = tabs.find((tab) => tab.id === value);
+    if (nextTab) {
+      setActiveTab(nextTab.id);
+    }
   };
 
   return (
-    <PillBar
-      role="tablist"
-      aria-label={t('tabs.views', { defaultValue: 'Workspace views' })}
-      className="min-w-max border border-border/40 bg-muted/50 shadow-inner shadow-black/[0.025] dark:shadow-black/10"
-    >
-      {tabs.map((tab, index) => {
-        const isActive = tab.id === activeTab;
-        const displayLabel = tab.kind === 'builtin' ? t(tab.labelKey) : tab.label;
+    <Tabs value={activeTab} onValueChange={selectTab} className="w-max">
+      <TabsList
+        aria-label={t('tabs.views', { defaultValue: 'Workspace views' })}
+        className="w-max gap-1.5"
+      >
+        {tabs.map((tab, index) => {
+          const isActive = tab.id === activeTab;
+          const displayLabel = tab.kind === 'builtin' ? t(tab.labelKey) : tab.label;
 
-        return (
-          <Fragment key={`${tab.id}-${index}`}>
-            {index === builtInTabs.length && pluginTabs.length > 0 && (
-              <span aria-hidden="true" className="mx-1 h-4 w-px shrink-0 bg-border" />
-            )}
-            <Tooltip content={displayLabel} position="bottom">
-              <Pill
-                role="tab"
-                aria-label={displayLabel}
-                aria-selected={isActive}
-                tabIndex={isActive ? 0 : -1}
-                isActive={isActive}
-                onClick={() => setActiveTab(tab.id)}
-                onKeyDown={handleTabKeyDown}
-                className="h-8 max-w-44 px-2.5 py-[5px]"
-              >
-                {tab.kind === 'builtin' ? (
-                  <tab.icon className="h-3.5 w-3.5 shrink-0" strokeWidth={isActive ? 2.2 : 1.8} />
-                ) : (
-                  <PluginIcon
-                    pluginName={tab.pluginName}
-                    iconFile={tab.iconFile}
-                    className="flex h-3.5 w-3.5 shrink-0 items-center justify-center [&>svg]:h-full [&>svg]:w-full"
-                  />
-                )}
-                <span className={`${isActive ? 'inline max-w-28' : 'hidden'} truncate sm:max-w-36 lg:inline`}>
-                  {displayLabel}
-                </span>
-              </Pill>
-            </Tooltip>
-          </Fragment>
-        );
-      })}
-    </PillBar>
+          return (
+            <Fragment key={`${tab.id}-${index}`}>
+              {index === builtInTabs.length && pluginTabs.length > 0 && (
+                <span aria-hidden="true" className="mx-1 h-4 w-px shrink-0 bg-border" />
+              )}
+              <Tooltip content={displayLabel} position="bottom">
+                <TabsTrigger
+                  value={tab.id}
+                  aria-label={displayLabel}
+                  className="size-7 px-0"
+                >
+                  {tab.kind === 'builtin' ? (
+                    <tab.icon className="h-3.5 w-3.5 shrink-0" strokeWidth={isActive ? 2.2 : 1.8} />
+                  ) : (
+                    <PluginIcon
+                      pluginName={tab.pluginName}
+                      iconFile={tab.iconFile}
+                      className="flex h-3.5 w-3.5 shrink-0 items-center justify-center [&>svg]:h-full [&>svg]:w-full"
+                    />
+                  )}
+                </TabsTrigger>
+              </Tooltip>
+            </Fragment>
+          );
+        })}
+      </TabsList>
+    </Tabs>
   );
 }

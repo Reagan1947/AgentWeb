@@ -1,7 +1,7 @@
 <div align="center">
- <img src="../public/logo.svg" alt="CloudCLI UI" width="64" height="64">
- <h1>Cloud CLI（又名 Claude Code UI）</h1>
- <p><a href="https://docs.anthropic.com/en/docs/claude-code">Claude Code</a>、<a href="https://docs.cursor.com/en/cli/overview">Cursor CLI</a>、<a href="https://developers.openai.com/codex">Codex</a> 的桌面和移动端 UI。可在本地或远程使用，从任何地方查看激活的项目与会话。</p>
+ <img src="../public/agentweb-icon.png" alt="AgentWeb" width="128" height="128">
+ <h1>AgentWeb</h1>
+ <p><a href="https://docs.anthropic.com/en/docs/claude-code">Claude Code</a>、<a href="https://docs.cursor.com/en/cli/overview">Cursor CLI</a>、<a href="https://developers.openai.com/codex">Codex</a> 的桌面和移动端界面。<br>本项目在 <a href="https://github.com/siteboon/claudecodeui">CloudCLI UI</a> 的基础上继续开发，重点优化了交互界面。可在本地或远程使用，从任何地方查看正在进行的项目与会话。</p>
 </div>
 
 <p align="center">
@@ -19,34 +19,21 @@
 
 ---
 
+## 关于本项目
+
+AgentWeb 基于 [CloudCLI UI](https://github.com/siteboon/claudecodeui)（CloudCLI UI，也称 Claude Code UI）。它保留了原项目面向 Claude Code、Cursor CLI 与 Codex 的工作区能力，并在此基础上优化交互界面，让对话、导航和周围工作区在使用代理时更顺手。
+
+下文介绍的是本项目所基于的 CloudCLI UI 能力，包括自托管、CloudCLI Cloud，以及原有功能。
+
+---
+
 ## 截图
 
 <div align="center">
 
-<table>
-<tr>
-<td align="center">
-<h3>桌面视图</h3>
-<img src="../public/screenshots/desktop-main.png" alt="桌面界面" width="400">
+<img src="../public/screenshots/agentweb-main.png" alt="AgentWeb 主界面" width="800">
 <br>
-<em>显示项目概览和聊天的主界面</em>
-</td>
-<td align="center">
-<h3>移动体验</h3>
-<img src="../public/screenshots/mobile-chat.png" alt="移动界面" width="250">
-<br>
-<em>具有触控导航的响应式移动设计</em>
-</td>
-</tr>
-<tr>
-<td align="center" colspan="2">
-<h3>CLI 选择</h3>
-<img src="../public/screenshots/cli-selection.png" alt="CLI 选择" width="400">
-<br>
-<em>在 Claude Code、Cursor CLI 与 Codex 之间进行选择</em>
-</td>
-</tr>
-</table>
+<em>项目列表与对话，展示优化后的 AgentWeb 界面</em>
 
 </div>
 
@@ -228,6 +215,10 @@ GNU Affero 通用公共许可证 v3.0 或更高版本 (AGPL-3.0-or-later) - 详�
 该项目为开源软件，在 GNU Affero 通用公共许可证 v3.0 或更高版本 (AGPL-3.0-or-later) 下可自由使用、修改与分发。
 
 ## 致谢
+
+### 基于
+
+- **[CloudCLI UI](https://github.com/siteboon/claudecodeui)** — 上游项目。AgentWeb 在该代码库上继续开发，并加入了交互界面优化。
 
 ### 使用技术
 - **[Claude Code](https://docs.anthropic.com/en/docs/claude-code)** - Anthropic 官方 CLI

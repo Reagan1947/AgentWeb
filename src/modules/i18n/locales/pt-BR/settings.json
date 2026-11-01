@@ -126,6 +126,7 @@
     "label": "Configurações",
     "agents": "Agentes",
     "appearance": "Aparência",
+    "commands": "Comandos",
     "git": "Git",
     "apiTokens": "API & Tokens",
     "voice": "Voz",
@@ -375,6 +376,9 @@
     }
   },
   "agents": {
+    "list": {
+      "description": "Escolha um agente para gerenciar a conta, as permissões e as ferramentas."
+    },
     "authStatus": {
       "checking": "Verificando...",
       "connected": "Conectado",

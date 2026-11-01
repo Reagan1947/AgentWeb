@@ -18,7 +18,7 @@ type MessageProps = React.ComponentProps<'div'> & {
   align?: 'start' | 'end';
 };
 
-/** Used by the chat transcript as the row around one turn: avatar, body, header and footer. */
+/** Used by the chat transcript as the row around one turn: body, header and footer. */
 export function Message({ className, align = 'start', ...props }: MessageProps) {
   return (
     <div
@@ -26,20 +26,6 @@ export function Message({ className, align = 'start', ...props }: MessageProps) 
       data-align={align}
       className={cn(
         'group/message relative flex w-full min-w-0 gap-3 data-[align=end]:flex-row-reverse',
-        className,
-      )}
-      {...props}
-    />
-  );
-}
-
-/** Avatar slot of Message, aligned to the bottom of the row. Used by the chat transcript. */
-export function MessageAvatar({ className, ...props }: React.ComponentProps<'div'>) {
-  return (
-    <div
-      data-slot="message-avatar"
-      className={cn(
-        'flex h-8 w-8 shrink-0 items-center justify-center self-end overflow-hidden rounded-full bg-muted',
         className,
       )}
       {...props}

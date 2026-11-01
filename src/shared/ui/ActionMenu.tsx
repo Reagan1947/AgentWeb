@@ -83,6 +83,11 @@ type ActionMenuProps = {
   header?: React.ReactNode;
   onOpenChange?: (open: boolean) => void;
   /**
+   * Smaller type, icons, and padding. The sidebar project and session menus
+   * use this so a right-click stays compact beside the row.
+   */
+  compact?: boolean;
+  /**
    * `context` opens the menu from a right-click (or the context-menu key) on
    * `children` and omits the button. `button` is the overflow trigger.
    */
@@ -107,6 +112,7 @@ export function ActionMenu({
   portal = false,
   header,
   onOpenChange,
+  compact = false,
   trigger = 'button',
   children,
 }: ActionMenuProps) {
@@ -227,9 +233,13 @@ export function ActionMenu({
     item.onSelect();
   };
 
-  const menuHeight = () =>
-    (header ? 72 : 0)
-    + items.reduce((height, item) => height + (item.description ? 58 : 40) + (item.showDividerBefore ? 9 : 0), 12);
+  const menuHeight = () => {
+    const headerHeight = header ? (compact ? 56 : 72) : 0;
+    const rowHeight = (item: ActionMenuItem) =>
+      (item.description ? (compact ? 44 : 58) : (compact ? 32 : 40))
+      + (item.showDividerBefore ? 9 : 0);
+    return headerHeight + items.reduce((height, item) => height + rowHeight(item), compact ? 8 : 12);
+  };
 
   const placeMenu = (clientX: number, clientY: number, focusMenu: boolean) => {
     const menuWidth = 260;
@@ -328,8 +338,9 @@ export function ActionMenu({
               disabled={item.disabled || item.loading}
               onClick={() => runItem(item)}
               className={cn(
-                'flex w-full items-start gap-3 rounded-md px-3 py-2 text-left text-sm transition-colors',
+                'flex w-full items-start rounded-md text-left transition-colors',
                 'focus:outline-none focus-visible:bg-accent',
+                compact ? 'gap-2 px-2.5 py-1.5 text-xs' : 'gap-3 px-3 py-2 text-sm',
                 item.disabled || item.loading
                   ? 'cursor-not-allowed opacity-50'
                   : item.isDanger
@@ -338,14 +349,17 @@ export function ActionMenu({
               )}
             >
               {item.loading ? (
-                <Loader2 className="mt-0.5 h-4 w-4 flex-shrink-0 animate-spin" />
+                <Loader2 className={cn('flex-shrink-0 animate-spin', compact ? 'mt-px h-3.5 w-3.5' : 'mt-0.5 h-4 w-4')} />
               ) : (
-                Icon && <Icon className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                Icon && <Icon className={cn('flex-shrink-0', compact ? 'mt-px h-3.5 w-3.5' : 'mt-0.5 h-4 w-4')} />
               )}
               <span className="min-w-0 flex-1">
-                <span className="block font-medium leading-5">{item.label}</span>
+                <span className={cn('block font-medium', compact ? 'leading-4' : 'leading-5')}>{item.label}</span>
                 {item.description && (
-                  <span className="mt-0.5 block text-xs leading-4 text-muted-foreground">
+                  <span className={cn(
+                    'mt-0.5 block text-muted-foreground',
+                    compact ? 'text-[10px] leading-3' : 'text-xs leading-4',
+                  )}>
                     {item.description}
                   </span>
                 )}

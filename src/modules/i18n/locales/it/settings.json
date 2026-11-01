@@ -109,6 +109,7 @@
     "label": "Impostazioni",
     "agents": "Agenti",
     "appearance": "Aspetto",
+    "commands": "Comandi",
     "git": "Git",
     "apiTokens": "API e Token",
     "tasks": "Attività",
@@ -332,6 +333,9 @@
     }
   },
   "agents": {
+    "list": {
+      "description": "Scegli un agente per gestire account, permessi e strumenti."
+    },
     "authStatus": {
       "checking": "Verifica...",
       "connected": "Connesso",

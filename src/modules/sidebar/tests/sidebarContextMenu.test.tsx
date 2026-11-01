@@ -4,7 +4,8 @@ import { fireEvent, render } from '@testing-library/react';
 import React from 'react';
 import { test, vi } from 'vitest';
 
-import type { Project, SessionWithProvider, SidebarProjectListProps } from '@/shared/types';
+import { SELECTED_SESSION_ROW_CLASS } from '@/shared/constants';
+import type { Project, ProjectSession, SessionWithProvider, SidebarProjectListProps } from '@/shared/types';
 
 /**
  * Project sessions keep their age, and open the same options from the "…"
@@ -84,7 +85,7 @@ test('a project session row keeps its age and opens its menu from the … button
   assert.ok(button, 'hover reveals a … button for the same menu');
   const highlight = button.parentElement;
   assert.equal(highlight?.className.includes('hover:bg-accent'), true, 'the hover fill covers the … button');
-  assert.equal(highlight?.className.includes('hover:bg-accent/50'), false, 'session hover matches the selected fill');
+  assert.equal(highlight?.className.includes('hover:bg-accent/50'), false, 'an unselected session hover stays the full accent fill');
   assert.equal(highlight?.contains(row), true);
   assert.equal(row.className.includes('hover:bg-accent/50'), false, 'the link does not paint a shorter fill');
   fireEvent.click(button);
@@ -102,4 +103,38 @@ test('a project session row keeps its age and opens its menu from the … button
   assert.ok(rename);
   fireEvent.click(rename);
   assert.deepEqual(onStartEditingSession.mock.calls, [['project-1', 's1', 'session one']]);
+});
+
+test('the open session uses the theme fill', () => {
+  const { container } = render(
+    <SidebarSessionItem
+      project={PROJECT}
+      session={SESSION}
+      selectedSession={{ id: 's1' } as ProjectSession}
+      isProcessing={false}
+      hasBackgroundWork={false}
+      needsAttention={false}
+      currentTime={NOW}
+      isEditing={false}
+      renameDraft=""
+      onRenameDraftChange={noop}
+      onStartEditingSession={noop}
+      onCancelEditingSession={noop}
+      onSaveEditingSession={noop}
+      onProjectSelect={noop}
+      onSessionSelect={noop}
+      onDeleteSession={noop}
+      isSelecting={false}
+      isChecked={false}
+      onToggleSessionSelected={noop}
+      t={t}
+    />,
+  );
+
+  const highlight = container.querySelector('button[aria-label^="Session options"]')?.parentElement;
+  assert.ok(highlight);
+  assert.equal(highlight.className.includes('bg-[#dbdbdc]'), true, 'the open session is filled with #dbdbdc in light mode');
+  assert.equal(highlight.className.includes('dark:bg-[#2b2b2b]'), true, 'the open session is filled with #2b2b2b in dark mode');
+  assert.equal(highlight.className.includes(SELECTED_SESSION_ROW_CLASS), true);
+  assert.equal(highlight.className.includes('bg-accent'), false, 'the open session is not the neutral hover fill');
 });

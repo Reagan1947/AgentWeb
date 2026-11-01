@@ -12,6 +12,16 @@ import { providerMcpService } from '@/modules/providers/index.js';
 import { getModuleDirectory } from '@/shared/utils.js';
 
 import { getBrowserUseRuntime } from './browser-use-runtime.js';
+import {
+  DEFAULT_STEEL_BASE_URL,
+  launchAgentBrowser,
+  normalizeSteelApiKey,
+  normalizeSteelBaseUrl,
+  probeSteel,
+  readSteelApiKey,
+  readSteelBaseUrl,
+  releaseSteelSession,
+} from './steel-browser.js';
 
 const require = createRequire(import.meta.url);
 const __dirname = getModuleDirectory(import.meta.url);
@@ -37,6 +47,8 @@ type BrowserUseSession = {
   lastAction: string | null;
   message: string | null;
   profileName: string | null;
+  provider: 'steel' | 'playwright' | null;
+  debugUrl: string | null;
   viewport: {
     width: number;
     height: number;
@@ -54,10 +66,21 @@ type RuntimeHandle = {
   browser?: any;
   context?: any;
   page?: any;
+  provider?: 'steel' | 'playwright';
+  steelSessionId?: string | null;
+  steelBaseUrl?: string | null;
+  steelApiKey?: string | null;
 };
 
 type BrowserUseSettings = {
   enabled: boolean;
+  steelBaseUrl: string;
+  steelApiKey: string;
+};
+
+type SteelProbe = {
+  reachable: boolean;
+  authenticated: boolean;
 };
 
 type RuntimeReadiness = {
@@ -76,10 +99,14 @@ const handles = new Map<string, RuntimeHandle>();
 let installPromise: Promise<{ success: boolean; message: string }> | null = null;
 let lastInstallMessage: string | null = null;
 let runtimeProbeCache: { value: RuntimeProbe; updatedAt: number } | null = null;
+let steelProbeCache: { key: string; value: SteelProbe; updatedAt: number } | null = null;
 
 const DEFAULT_SETTINGS: BrowserUseSettings = {
   enabled: false,
+  steelBaseUrl: DEFAULT_STEEL_BASE_URL,
+  steelApiKey: '',
 };
+const STEEL_PROBE_CACHE_TTL_MS = 30_000;
 const AGENT_OWNER_ID = 'agent';
 const PROFILE_ROOT = path.join(os.homedir(), '.cloudcli', 'browser-use', 'profiles');
 const MCP_SERVER_NAME = 'cloudcli-browser';
@@ -96,6 +123,8 @@ function readSettings(): BrowserUseSettings {
     const parsed = JSON.parse(raw) as Partial<BrowserUseSettings>;
     return {
       enabled: parsed.enabled === true,
+      steelBaseUrl: readSteelBaseUrl(parsed.steelBaseUrl, Object.prototype.hasOwnProperty.call(parsed, 'steelBaseUrl')),
+      steelApiKey: readSteelApiKey(parsed.steelApiKey),
     };
   } catch (error: any) {
     console.warn('[Browser] Failed to read settings:', error?.message || error);
@@ -106,10 +135,67 @@ function readSettings(): BrowserUseSettings {
 function writeSettings(settings: BrowserUseSettings): BrowserUseSettings {
   const normalized = {
     enabled: settings.enabled === true,
+    steelBaseUrl: normalizeSteelBaseUrl(settings.steelBaseUrl),
+    steelApiKey: normalizeSteelApiKey(settings.steelApiKey),
   };
 
   appConfigDb.set(BROWSER_USE_SETTINGS_KEY, JSON.stringify(normalized));
+  steelProbeCache = null;
   return normalized;
+}
+
+async function getSteelProbe(settings: BrowserUseSettings): Promise<SteelProbe> {
+  if (!settings.steelBaseUrl) {
+    return { reachable: false, authenticated: false };
+  }
+
+  const key = `${settings.steelBaseUrl}\n${settings.steelApiKey}`;
+  const now = Date.now();
+  if (
+    steelProbeCache
+    && steelProbeCache.key === key
+    && now - steelProbeCache.updatedAt < STEEL_PROBE_CACHE_TTL_MS
+  ) {
+    return steelProbeCache.value;
+  }
+
+  const value = await probeSteel(settings.steelBaseUrl, { apiKey: settings.steelApiKey });
+  steelProbeCache = { key, value, updatedAt: now };
+  return value;
+}
+
+function describeBrowserAvailability(
+  settings: BrowserUseSettings,
+  readiness: RuntimeReadiness,
+  steel: SteelProbe,
+): string {
+  if (!settings.enabled) {
+    return 'Browser is disabled in settings.';
+  }
+
+  if (!readiness.playwrightInstalled) {
+    return 'Install Playwright to connect to Steel or local Chromium.';
+  }
+
+  if (settings.steelBaseUrl && steel.reachable && !steel.authenticated) {
+    return 'Steel rejected the API key. Update it in Browser settings, or clear the Steel address to use local Playwright.';
+  }
+
+  if (settings.steelBaseUrl && steel.reachable && steel.authenticated) {
+    return 'Steel is reachable. New agent sessions open a live view in the Browser tab.';
+  }
+
+  if (readiness.chromiumInstalled) {
+    return settings.steelBaseUrl
+      ? 'Steel is not running. Agent sessions use local Playwright until it is reachable.'
+      : 'Browser runtime is available.';
+  }
+
+  if (settings.steelBaseUrl) {
+    return 'Steel is not running, and local Chromium is not installed.';
+  }
+
+  return 'Playwright is installed, but Chromium is missing. Install the Chromium runtime to continue.';
 }
 
 function getOrCreateMcpToken(): string {
@@ -122,21 +208,6 @@ function getOrCreateMcpToken(): string {
   return token;
 }
 
-function getSetupMessage(settings: BrowserUseSettings, readiness: RuntimeReadiness): string {
-  if (!settings.enabled) {
-    return 'Browser is disabled in settings.';
-  }
-
-  if (!readiness.playwrightInstalled) {
-    return 'Install Playwright and Chromium to use browser sessions.';
-  }
-
-  if (!readiness.chromiumInstalled) {
-    return 'Playwright is installed, but Chromium is missing. Install the Chromium runtime to continue.';
-  }
-
-  return readiness.installMessage || 'Browser runtime is not ready.';
-}
 
 function getPlaywright(): any | null {
   try {
@@ -357,8 +428,68 @@ function ownerSessions(ownerId: string): BrowserUseSession[] {
 async function closeHandle(sessionId: string): Promise<void> {
   const handle = handles.get(sessionId);
   handles.delete(sessionId);
-  await handle?.context?.close?.().catch(() => undefined);
-  await handle?.browser?.close().catch(() => undefined);
+  if (!handle) {
+    return;
+  }
+
+  // Disconnect Playwright before releasing Steel. Closing the CDP context would
+  // tear down the page Steel still owns; the release call ends that Chrome.
+  if (handle.provider === 'steel') {
+    await handle.browser?.close().catch(() => undefined);
+    if (handle.steelBaseUrl && handle.steelSessionId) {
+      await releaseSteelSession(handle.steelBaseUrl, handle.steelSessionId, {
+        apiKey: handle.steelApiKey || '',
+      }).catch((error) => {
+        console.warn(
+          '[Browser] Failed to release Steel session:',
+          error instanceof Error ? error.message : error,
+        );
+      });
+    }
+    return;
+  }
+
+  await handle.context?.close?.().catch(() => undefined);
+  await handle.browser?.close().catch(() => undefined);
+}
+
+async function refreshOpenPageLabels(): Promise<void> {
+  await Promise.all([...sessions.values()].map(async (session) => {
+    if (session.status !== 'ready') {
+      return;
+    }
+
+    const page = handles.get(session.id)?.page;
+    if (!page) {
+      return;
+    }
+
+    try {
+      const nextUrl = typeof page.url === 'function' ? page.url() : session.url;
+      const nextTitle = typeof page.title === 'function'
+        ? await new Promise<string | null>((resolve) => {
+          const timer = setTimeout(() => resolve(session.title), 1000);
+          timer.unref?.();
+          Promise.resolve(page.title())
+            .then((title: string | null) => {
+              clearTimeout(timer);
+              resolve(title);
+            })
+            .catch(() => {
+              clearTimeout(timer);
+              resolve(session.title);
+            });
+        })
+        : session.title;
+      if (nextUrl !== session.url || nextTitle !== session.title) {
+        session.url = nextUrl || session.url;
+        session.title = nextTitle;
+        session.updatedAt = new Date().toISOString();
+      }
+    } catch {
+      // The page can close between polls. The next agent action reports that.
+    }
+  }));
 }
 
 async function expireStaleSessions(now = Date.now()): Promise<void> {
@@ -424,6 +555,12 @@ export const browserUseService = {
     const current = readSettings();
     const nextSettings = {
       enabled: typeof settings.enabled === 'boolean' ? settings.enabled : current.enabled,
+      steelBaseUrl: Object.prototype.hasOwnProperty.call(settings, 'steelBaseUrl')
+        ? normalizeSteelBaseUrl(settings.steelBaseUrl)
+        : current.steelBaseUrl,
+      steelApiKey: Object.prototype.hasOwnProperty.call(settings, 'steelApiKey')
+        ? normalizeSteelApiKey(settings.steelApiKey)
+        : current.steelApiKey,
     };
 
     const next = writeSettings(nextSettings);
@@ -439,7 +576,10 @@ export const browserUseService = {
   async getStatus() {
     const settings = readSettings();
     const readiness = getRuntimeReadiness();
-    const available = settings.enabled && readiness.playwrightInstalled && readiness.chromiumInstalled;
+    const steel = await getSteelProbe(settings);
+    const steelReady = Boolean(settings.steelBaseUrl) && steel.reachable && steel.authenticated;
+    const localReady = readiness.chromiumInstalled;
+    const available = settings.enabled && readiness.playwrightInstalled && (steelReady || localReady);
 
     return {
       enabled: settings.enabled,
@@ -448,10 +588,11 @@ export const browserUseService = {
       playwrightInstalled: readiness.playwrightInstalled,
       chromiumInstalled: readiness.chromiumInstalled,
       installInProgress: readiness.installInProgress,
+      steelConfigured: Boolean(settings.steelBaseUrl),
+      steelReachable: steel.reachable,
+      steelAuthenticated: steel.authenticated,
       sessionCount: sessions.size,
-      message: available
-        ? 'Browser runtime is available.'
-        : getSetupMessage(settings, readiness),
+      message: describeBrowserAvailability(settings, readiness, steel),
     };
   },
 
@@ -493,6 +634,7 @@ export const browserUseService = {
 
   async listSessions() {
     await expireStaleSessions();
+    await refreshOpenPageLabels();
     return [...sessions.values()]
       .filter((session) => session.ownerId === AGENT_OWNER_ID)
       .map(publicSession);
@@ -522,6 +664,8 @@ export const browserUseService = {
       lastAction: 'create',
       message: null,
       profileName,
+      provider: null,
+      debugUrl: null,
       viewport: { width: 1440, height: 900 },
       cursor: null,
     };
@@ -532,41 +676,66 @@ export const browserUseService = {
     }
 
     const readiness = getRuntimeReadiness();
-    if (!settings.enabled || !readiness.playwrightInstalled || !readiness.chromiumInstalled || !readiness.playwright) {
-      session.message = getSetupMessage(settings, readiness);
+    const steel = await getSteelProbe(settings);
+    const localReady = readiness.playwrightInstalled && readiness.chromiumInstalled && Boolean(readiness.playwright);
+    // Named profiles stay on local disk. Steel does not share those Chrome profiles.
+    const steelReady = !profileName
+      && Boolean(settings.steelBaseUrl)
+      && readiness.playwrightInstalled
+      && steel.reachable
+      && steel.authenticated;
+
+    if (settings.steelBaseUrl && !profileName && steel.reachable && !steel.authenticated) {
+      session.message = 'Steel rejected the API key. Update it in Browser settings, or clear the Steel address to use local Playwright.';
       sessions.set(session.id, session);
       return publicSession(session);
     }
 
-    let browser: any | undefined;
-    let context: any | undefined;
-    let page: any;
-    const launchOptions = {
-      headless: true,
-      args: ['--disable-dev-shm-usage'],
-    };
-    const contextOptions = {
-      viewport: { width: 1440, height: 900 },
-      serviceWorkers: 'block',
-    };
+    if (!steelReady && !localReady) {
+      session.message = describeBrowserAvailability(settings, readiness, steel);
+      sessions.set(session.id, session);
+      return publicSession(session);
+    }
 
     if (profileName) {
       fs.mkdirSync(PROFILE_ROOT, { recursive: true });
-      context = await readiness.playwright.chromium.launchPersistentContext(getProfilePath(profileName), {
-        ...launchOptions,
-        ...contextOptions,
-      });
-      page = context.pages()[0] || await context.newPage();
-    } else {
-      browser = await readiness.playwright.chromium.launch(launchOptions);
-      context = await browser.newContext(contextOptions);
-      page = await context.newPage();
     }
-    session.status = 'ready';
-    session.message = 'Browser session is ready.';
-    sessions.set(session.id, session);
-    handles.set(session.id, { browser, context, page });
-    await captureSession(session, page);
+
+    try {
+      const launched = await launchAgentBrowser({
+        playwright: readiness.playwright,
+        steelBaseUrl: steelReady ? settings.steelBaseUrl : '',
+        steelApiKey: settings.steelApiKey,
+        profilePath: profileName ? getProfilePath(profileName) : null,
+        viewport: session.viewport || { width: 1440, height: 900 },
+        allowLocalFallback: localReady,
+      });
+      session.status = 'ready';
+      session.provider = launched.provider;
+      session.debugUrl = launched.debugUrl;
+      session.message = launched.provider === 'steel'
+        ? 'Browser session is ready. The live view is in the Browser tab.'
+        : 'Browser session is ready.';
+      sessions.set(session.id, session);
+      handles.set(session.id, {
+        browser: launched.browser,
+        context: launched.context,
+        page: launched.page,
+        provider: launched.provider,
+        steelSessionId: launched.steelSessionId,
+        steelBaseUrl: launched.steelBaseUrl,
+        steelApiKey: launched.provider === 'steel' ? settings.steelApiKey : null,
+      });
+      await captureSession(session, launched.page);
+    } catch (error) {
+      await closeHandle(session.id);
+      session.status = 'unavailable';
+      session.provider = null;
+      session.debugUrl = null;
+      session.message = error instanceof Error ? error.message : 'Failed to create a browser session.';
+      sessions.set(session.id, session);
+    }
+
     return publicSession(session);
   },
 
@@ -576,6 +745,7 @@ export const browserUseService = {
       return [];
     }
     await expireStaleSessions();
+    await refreshOpenPageLabels();
     return [...sessions.values()]
       .filter((session) => session.ownerId === AGENT_OWNER_ID)
       .map(publicSession);

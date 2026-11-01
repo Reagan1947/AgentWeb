@@ -135,14 +135,8 @@ export default function McpServers({ selectedProvider, currentProjects }: McpSer
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex min-w-0 items-start gap-3">
-          <Server className="mt-0.5 h-5 w-5 flex-shrink-0 text-purple-500" />
-          <div className="min-w-0 space-y-1">
-            <h3 className="text-lg font-medium text-foreground">{t('mcpServers.title')}</h3>
-            <p className="text-sm text-muted-foreground">{description}</p>
-          </div>
-        </div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className="min-w-0 text-sm text-muted-foreground">{description}</p>
         <ActionMenu
           label={t('mcpServersAdd.menuLabel')}
           icon={Plus}
@@ -168,7 +162,7 @@ export default function McpServers({ selectedProvider, currentProjects }: McpSer
 
       </div>
 
-      <div className="space-y-2">
+      {(saveStatus === 'success' || isLoadingProjectScopes) && (
         <div className="min-h-4">
           {saveStatus === 'success' && (
             <span className="animate-in fade-in text-xs text-muted-foreground">{t('saveStatus.success')}</span>
@@ -177,7 +171,7 @@ export default function McpServers({ selectedProvider, currentProjects }: McpSer
             <span className="animate-in fade-in text-xs text-muted-foreground">{t('mcpServersAdd.refreshingScopes')}</span>
           )}
         </div>
-      </div>
+      )}
 
       {(loadError || deleteError) && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800/60 dark:bg-red-900/20 dark:text-red-200">

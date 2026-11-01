@@ -1,6 +1,13 @@
 import { useTranslation } from 'react-i18next';
 
-import { Input } from '@/shared/ui';
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+  InputGroup,
+  InputGroupInput,
+} from '@/shared/ui';
 import { shouldShowGithubAuthentication } from '@/modules/project-creation-wizard/utils/pathUtils';
 import type { GithubTokenCredential, TokenMode } from '@/shared/types';
 import GithubAuthenticationCard from '@/modules/project-creation-wizard/GithubAuthenticationCard';
@@ -46,40 +53,39 @@ export default function StepConfiguration({
   const showGithubAuth = shouldShowGithubAuthentication(githubUrl);
 
   return (
-    <div className="space-y-4">
-      <div>
-        <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+    <FieldGroup>
+      <Field>
+        <FieldLabel htmlFor="project-workspace-path">
           {t('projectWizard.step2.newPath')}
-        </label>
+        </FieldLabel>
 
         <WorkspacePathField
+          id="project-workspace-path"
           value={workspacePath}
           disabled={isCreating}
           onChange={onWorkspacePathChange}
           onAdvanceToConfirm={onAdvanceToConfirm}
         />
 
-        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          {t('projectWizard.step2.newHelp')}
-        </p>
-      </div>
+        <FieldDescription>{t('projectWizard.step2.newHelp')}</FieldDescription>
+      </Field>
 
-      <div>
-        <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+      <Field>
+        <FieldLabel htmlFor="project-github-url">
           {t('projectWizard.step2.githubUrl')}
-        </label>
-        <Input
-          type="text"
-          value={githubUrl}
-          onChange={(event) => onGithubUrlChange(event.target.value)}
-          placeholder="https://github.com/username/repository"
-          className="w-full"
-          disabled={isCreating}
-        />
-        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          {t('projectWizard.step2.githubHelp')}
-        </p>
-      </div>
+        </FieldLabel>
+        <InputGroup data-disabled={isCreating || undefined}>
+          <InputGroupInput
+            id="project-github-url"
+            type="text"
+            value={githubUrl}
+            onChange={(event) => onGithubUrlChange(event.target.value)}
+            placeholder="https://github.com/username/repository"
+            disabled={isCreating}
+          />
+        </InputGroup>
+        <FieldDescription>{t('projectWizard.step2.githubHelp')}</FieldDescription>
+      </Field>
 
       {showGithubAuth && (
         <GithubAuthenticationCard
@@ -94,6 +100,6 @@ export default function StepConfiguration({
           onNewGithubTokenChange={onNewGithubTokenChange}
         />
       )}
-    </div>
+    </FieldGroup>
   );
 }

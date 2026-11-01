@@ -107,8 +107,11 @@ beforeEach(() => {
     }
     if (String(url).includes('/api/user/drafts/queued-message') && init?.method === 'POST') {
       // Nothing else is queued: the server queues the message on its own.
-      const { queuedMessage } = JSON.parse(String(init.body)) as { queuedMessage: unknown };
-      return new Response(JSON.stringify({ success: true, queuedMessage, appended: false }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      const { queuedMessage } = JSON.parse(String(init.body)) as { queuedMessage: { content?: string; attachments?: unknown[]; options?: unknown } };
+      return new Response(JSON.stringify({
+        success: true,
+        queuedMessages: [{ id: 'queued-1', ...queuedMessage }],
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }
     return new Response('[]', { status: 200, headers: { 'Content-Type': 'application/json' } });
   }));
@@ -172,7 +175,7 @@ test('queue persists the message behind the work with its uploaded files, sends 
   assert.equal(stored?.content, 'hello');
   assert.deepEqual(stored?.attachments, [UPLOADED]);
   assert.equal(stored?.options?.model, 'test-model');
-  assert.equal(view.result.current.queuedDraft?.content, 'hello', 'the queued card shows the message');
+  assert.equal(view.result.current.queuedDrafts[0]?.content, 'hello', 'the queued row shows the message');
   assert.equal(view.result.current.input, '', 'and the composer is cleared, as when queueing during a turn');
   assert.equal(view.result.current.attachedFiles.length, 0);
 });

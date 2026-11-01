@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 
 import { usePaletteOpsRegister } from '@/modules/command-palette';
 import { writeSelectedProvider } from '@/shared/selectedProvider';
@@ -16,9 +16,15 @@ export default function ProjectEffects({
     setSidebarOpen,
   } = useProjectEffectsState();
 
+  // Stable so the palette registry is not rewritten on every workspace render.
+  const showChat = useCallback(() => {
+    setActiveTab('chat');
+  }, [setActiveTab]);
+
   usePaletteOpsRegister({
     openSettings,
     refreshProjects: refreshProjectsSilently,
+    showChat,
   });
 
   useEffect(() => {

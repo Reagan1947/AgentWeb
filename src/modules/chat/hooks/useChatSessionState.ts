@@ -189,6 +189,9 @@ function chatMessageToNormalized(
 /*  Hook                                                              */
 /* ------------------------------------------------------------------ */
 
+/** How long the jump-to-bottom button takes to glide to the live edge. */
+const JUMP_TO_BOTTOM_MS = 380;
+
 export function useChatSessionState({
   isActive,
   selectedProject,
@@ -218,6 +221,12 @@ export function useChatSessionState({
   const [showLoadAllOverlay, setShowLoadAllOverlay] = useState(false);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  /**
+   * True once the transcript is taller than the pane. Wheel and touch read
+   * this instead of measuring scrollHeight on every event: that read forces
+   * layout during a mobile drag and the scroll hitches.
+   */
+  const contentOverflowsRef = useRef(false);
   const wasNearTopRef = useRef(false);
   // The sidebar-search hit this transcript still owes the user a scroll to.
   // State rather than a ref because resolving it widens the render window,
@@ -238,6 +247,15 @@ export function useChatSessionState({
   const isUserScrolledUpRef = useRef(false);
   const isLoadingMoreRef = useRef(false);
   const allMessagesLoadedRef = useRef(false);
+  /**
+   * True while the jump-to-bottom button's smooth scroll is in flight.
+   * Those scroll events must not page in older messages, and must not clear
+   * `isUserScrolledUp` early: the follow effect would then instant-scroll and
+   * cut the glide off.
+   */
+  const jumpToBottomRef = useRef(false);
+  /** The in-flight glide frame, cancelled when the reader scrolls or the session changes. */
+  const jumpFrameRef = useRef<number | null>(null);
   const topLoadLockRef = useRef(false);
   const pendingScrollRestoreRef = useRef<ScrollRestoreState | null>(null);
   const pendingInitialScrollRef = useRef(true);
@@ -454,14 +472,71 @@ export function useChatSessionState({
     container.scrollTop = container.scrollHeight;
   }, []);
 
+  const collapseLoadedWindow = useCallback(() => {
+    if (!allMessagesLoadedRef.current) return;
+    setVisibleMessageCount(INITIAL_VISIBLE_MESSAGES);
+    setAllMessagesLoaded(false);
+    allMessagesLoadedRef.current = false;
+  }, []);
+
   const scrollToBottomAndReset = useCallback(() => {
-    scrollToBottom();
-    if (allMessagesLoaded) {
-      setVisibleMessageCount(INITIAL_VISIBLE_MESSAGES);
-      setAllMessagesLoaded(false);
-      allMessagesLoadedRef.current = false;
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    if (jumpFrameRef.current !== null) {
+      cancelAnimationFrame(jumpFrameRef.current);
+      jumpFrameRef.current = null;
     }
-  }, [allMessagesLoaded, scrollToBottom]);
+
+    const destination = () => {
+      const node = scrollContainerRef.current;
+      if (!node) return 0;
+      return Math.max(node.scrollHeight - node.clientHeight, 0);
+    };
+    const distance = destination() - container.scrollTop;
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // Opening a session, following a stream, and sending stay instant.
+    // Only this button glides. Native smooth scroll settles in one frame here,
+    // so the glide is driven by hand. Reduced motion keeps the jump.
+    if (distance < 1 || reduceMotion) {
+      jumpToBottomRef.current = false;
+      container.scrollTop = container.scrollHeight;
+      collapseLoadedWindow();
+      setIsUserScrolledUp(false);
+      return;
+    }
+
+    const startTop = container.scrollTop;
+    const startedAt = performance.now();
+    jumpToBottomRef.current = true;
+    scrollPositionRef.current = { height: container.scrollHeight, top: startTop };
+
+    const step = (now: number) => {
+      const node = scrollContainerRef.current;
+      if (!node || !jumpToBottomRef.current) {
+        jumpFrameRef.current = null;
+        return;
+      }
+      const progress = Math.min((now - startedAt) / JUMP_TO_BOTTOM_MS, 1);
+      const eased = 1 - (1 - progress) ** 3;
+      const target = Math.max(node.scrollHeight - node.clientHeight, 0);
+      node.scrollTop = startTop + (target - startTop) * eased;
+      if (!jumpToBottomRef.current) {
+        jumpFrameRef.current = null;
+        return;
+      }
+      if (progress < 1) {
+        jumpFrameRef.current = requestAnimationFrame(step);
+        return;
+      }
+      jumpFrameRef.current = null;
+      jumpToBottomRef.current = false;
+      node.scrollTop = node.scrollHeight;
+      collapseLoadedWindow();
+      setIsUserScrolledUp(false);
+    };
+    jumpFrameRef.current = requestAnimationFrame(step);
+  }, [collapseLoadedWindow]);
 
   const isNearBottom = useCallback(() => {
     const container = scrollContainerRef.current;
@@ -530,10 +605,28 @@ export function useChatSessionState({
     [hasMoreMessages, isActive, isLoadingMoreMessages, selectedProject, selectedSession, sessionStore],
   );
 
-  const handleScroll = useCallback(async () => {
+  const handleScroll = useCallback(async (event?: Event) => {
     if (!isActive) return;
     const container = scrollContainerRef.current;
     if (!container) return;
+
+    if (jumpToBottomRef.current) {
+      const userTookOver = event?.type === 'wheel'
+        || event?.type === 'touchmove'
+        || container.scrollTop + 1 < scrollPositionRef.current.top;
+      const gap = container.scrollHeight - container.scrollTop - container.clientHeight;
+      if (!userTookOver && gap > 1) {
+        setIsUserScrolledUp(true);
+        scrollPositionRef.current = { height: container.scrollHeight, top: container.scrollTop };
+        return;
+      }
+      if (jumpFrameRef.current !== null) {
+        cancelAnimationFrame(jumpFrameRef.current);
+        jumpFrameRef.current = null;
+      }
+      jumpToBottomRef.current = false;
+      if (!userTookOver) collapseLoadedWindow();
+    }
 
     const nearBottom = isNearBottom();
     setIsUserScrolledUp(!nearBottom);
@@ -569,7 +662,17 @@ export function useChatSessionState({
       const didLoad = await loadOlderMessages(container);
       if (didLoad) topLoadLockRef.current = true;
     }
-  }, [hasMoreMessages, isActive, isNearBottom, loadOlderMessages]);
+  }, [collapseLoadedWindow, hasMoreMessages, isActive, isNearBottom, loadOlderMessages]);
+
+  /**
+   * Wheel and touch reach the top pager only when the transcript is shorter
+   * than the pane and never emits `scroll`. A scrolling pane already reports
+   * `scroll`; handling the gesture too measures layout on every move.
+   */
+  const handleUnscrollablePaneGesture = useCallback((event?: Event) => {
+    if (contentOverflowsRef.current) return;
+    void handleScroll(event);
+  }, [handleScroll]);
 
   const wasChatActiveRef = useRef(isActive);
   useLayoutEffect(() => {
@@ -621,6 +724,11 @@ export function useChatSessionState({
 
     pendingInitialScrollRef.current = true;
     setVisibleMessageCount(INITIAL_VISIBLE_MESSAGES);
+    jumpToBottomRef.current = false;
+    if (jumpFrameRef.current !== null) {
+      cancelAnimationFrame(jumpFrameRef.current);
+      jumpFrameRef.current = null;
+    }
     topLoadLockRef.current = false;
     pendingScrollRestoreRef.current = null;
     wasNearTopRef.current = false;
@@ -636,7 +744,9 @@ export function useChatSessionState({
   //
   // This version re-scrolls every animation frame while scrollHeight is
   // still growing, capped at ~1s (60 frames) or 3 consecutive stable
-  // frames. Cancels cleanly on session change via the pending flag.
+  // frames. It stops early once the reader has dragged away from the bottom,
+  // so the pin does not fight the finger. A session change clears the pending
+  // flag and cancels the frame.
   useEffect(() => {
     if (!isActive) return;
     if (!pendingInitialScrollRef.current || !scrollContainerRef.current || isLoadingSessionMessages) return;
@@ -648,10 +758,20 @@ export function useChatSessionState({
     let lastHeight = 0;
     let stableCount = 0;
     let rafId = 0;
+    // The offset we last pinned. A smaller scrollTop on the next frame is the
+    // reader dragging away; pinning again yanks the transcript back down.
+    let lastPinnedTop = -1;
 
     const tick = () => {
       if (!pendingInitialScrollRef.current || !scrollContainerRef.current) return;
+      const gapFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+      const userMovedUp = lastPinnedTop >= 0 && container.scrollTop < lastPinnedTop - 1;
+      if (userMovedUp && gapFromBottom > 50) {
+        pendingInitialScrollRef.current = false;
+        return;
+      }
       container.scrollTop = container.scrollHeight;
+      lastPinnedTop = container.scrollTop;
       if (container.scrollHeight === lastHeight) {
         stableCount++;
       } else {
@@ -1019,9 +1139,28 @@ export function useChatSessionState({
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
-    container.addEventListener('scroll', handleScroll);
+    container.addEventListener('scroll', handleScroll, { passive: true });
     return () => container.removeEventListener('scroll', handleScroll);
   }, [handleScroll]);
+
+  // Tracks whether the pane can scroll without reading scrollHeight from a
+  // touch or wheel handler. Observing the pane and its children covers both
+  // the viewport resizing and the transcript growing.
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container || typeof ResizeObserver === 'undefined') return undefined;
+
+    const updateOverflow = () => {
+      contentOverflowsRef.current = container.scrollHeight - container.clientHeight > 1;
+    };
+    updateOverflow();
+    const observer = new ResizeObserver(updateOverflow);
+    observer.observe(container);
+    for (const child of container.children) {
+      observer.observe(child);
+    }
+    return () => observer.disconnect();
+  }, [chatMessages.length, isActive]);
 
   // "Load all" overlay visibility is driven by scroll-to-top in handleScroll;
   // timers are cleared on session change via the reset effect above.
@@ -1173,7 +1312,7 @@ export function useChatSessionState({
     scrollContainerRef,
     scrollToBottom,
     scrollToBottomAndReset,
-    handleScroll,
+    handleUnscrollablePaneGesture,
     requestLatestMessages,
   };
 }

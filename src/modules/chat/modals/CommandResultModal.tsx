@@ -4,7 +4,6 @@ import {
   Activity,
   BadgeCheck,
   CircleHelp,
-  Coins,
   Cpu,
   Gauge,
   Package,
@@ -18,7 +17,21 @@ import {
   X,
 } from 'lucide-react';
 
-import { Badge, Button, Dialog, DialogContent, DialogTitle, Input } from '@/shared/ui';
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  Badge,
+  Button,
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  Input,
+} from '@/shared/ui';
 import type {
   LLMProvider,
   ProviderModelActions,
@@ -418,82 +431,57 @@ function ModelsContent({
   );
 }
 
-function CostContent({ data }: { data: CostCommandData }) {
+type TokenUsageDialogProps = {
+  data: CostCommandData;
+  onClose: () => void;
+};
+
+/** Shown by CommandResultModal when the composer token button or /cost opens session usage. */
+function TokenUsageDialog({ data, onClose }: TokenUsageDialogProps) {
+  const { t } = useTranslation();
   const used = Number(data.tokenUsage?.used ?? 0);
   const total = Number(data.tokenUsage?.total ?? 0);
-  const model = data.model || 'Unknown';
-  const provider = getProviderLabel(data.provider, data.provider || 'Unknown');
   const hasBreakdown =
     typeof data.tokenBreakdown?.input === 'number' ||
     typeof data.tokenBreakdown?.output === 'number';
   const usageRows = [
-    { label: 'Total tokens used', value: formatNumber(used), icon: Activity },
+    { label: 'Total tokens used', value: formatNumber(used) },
     ...(hasBreakdown
       ? [
-          {
-            label: 'Input tokens',
-            value: formatNumber(Number(data.tokenBreakdown?.input ?? 0)),
-            icon: TerminalSquare,
-          },
-          {
-            label: 'Output tokens',
-            value: formatNumber(Number(data.tokenBreakdown?.output ?? 0)),
-            icon: Coins,
-          },
+          { label: 'Input tokens', value: formatNumber(Number(data.tokenBreakdown?.input ?? 0)) },
+          { label: 'Output tokens', value: formatNumber(Number(data.tokenBreakdown?.output ?? 0)) },
         ]
-      : [
-          {
-            label: 'Breakdown',
-            value: 'Unavailable',
-            icon: TerminalSquare,
-          },
-        ]),
+      : []),
     // Only when it is consistent with what was actually used. Claude reports
     // the window its model has once a turn completes, but until then (and for
     // providers that report none) it is the CONTEXT_WINDOW setting, which cannot
     // know whether a session runs a 200K or a 1M variant of the same model —
     // and a row reading "used 404,009 / window 160,000" is worse than no row.
-    ...(total > used
-      ? [{ label: 'Context window', value: formatNumber(total), icon: Gauge }]
-      : []),
+    ...(total > used ? [{ label: 'Context window', value: formatNumber(total) }] : []),
+    { label: 'Provider', value: getProviderLabel(data.provider, data.provider || 'Unknown') },
+    { label: 'Model', value: data.model || 'Unknown' },
   ];
 
   return (
-    <div className="space-y-4">
-      <div className="overflow-hidden rounded-2xl border border-border/70 bg-background/75">
-        {usageRows.map((row) => {
-          const Icon = row.icon;
-
-          return (
-            <div
-              key={row.label}
-              className="flex items-center justify-between gap-4 border-b border-border/60 px-4 py-3 last:border-b-0"
-            >
-              <div className="flex min-w-0 items-center gap-3">
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-primary/20 bg-primary/10 text-primary">
-                  <Icon className="h-4 w-4" />
-                </span>
-                <span className="truncate text-sm font-medium text-foreground">{row.label}</span>
-              </div>
-              <span className="shrink-0 font-mono text-sm font-semibold text-foreground">{row.value}</span>
+    <AlertDialog open onOpenChange={(open) => !open && onClose()}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{t('chat:misc.modalMeta.costTitle')}</AlertDialogTitle>
+          <AlertDialogDescription>{t('chat:misc.modalMeta.costSubtitle')}</AlertDialogDescription>
+        </AlertDialogHeader>
+        <dl className="grid gap-2 text-sm">
+          {usageRows.map((row) => (
+            <div key={row.label} className="flex items-start justify-between gap-4">
+              <dt className="text-muted-foreground">{row.label}</dt>
+              <dd className="break-all text-right font-medium text-foreground">{row.value}</dd>
             </div>
-          );
-        })}
-      </div>
-
-      <div className="rounded-2xl border border-border/70 bg-muted/20 p-4">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Provider</p>
-            <p className="mt-1 text-sm font-semibold text-foreground">{provider}</p>
-          </div>
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Model</p>
-            <p className="mt-1 break-all font-mono text-sm text-foreground">{model}</p>
-          </div>
-        </div>
-      </div>
-    </div>
+          ))}
+        </dl>
+        <AlertDialogFooter>
+          <AlertDialogCancel>{t('common:buttons.close')}</AlertDialogCancel>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
 
@@ -550,6 +538,11 @@ function CommandResultModal({
   onSelectProviderModel,
 }: CommandResultModalProps) {
   const { t } = useTranslation();
+
+  if (payload?.kind === 'cost') {
+    return <TokenUsageDialog data={payload.data as CostCommandData} onClose={onClose} />;
+  }
+
   const isOpen = Boolean(payload);
   const kind = payload?.kind;
   const isModelsModal = kind === 'models';
@@ -566,12 +559,6 @@ function CommandResultModal({
       title: t('chat:misc.modalMeta.modelsTitle'),
       subtitle: t('chat:misc.modalMeta.modelsSubtitle'),
       icon: Cpu,
-    },
-    cost: {
-      eyebrow: t('chat:misc.modalMeta.costEyebrow'),
-      title: t('chat:misc.modalMeta.costTitle'),
-      subtitle: t('chat:misc.modalMeta.costSubtitle'),
-      icon: Coins,
     },
     status: {
       eyebrow: t('chat:misc.modalMeta.statusEyebrow'),
@@ -640,7 +627,6 @@ function CommandResultModal({
               onSelectProviderModel={onSelectProviderModel}
             />
           )}
-          {payload?.kind === 'cost' && <CostContent data={payload.data as CostCommandData} />}
           {payload?.kind === 'status' && <StatusContent data={payload.data as StatusCommandData} />}
         </div>
 

@@ -53,7 +53,7 @@ function TokenUsageSummary({ usage, onClick }: TokenUsageSummaryProps) {
       type="button"
       data-slot="context"
       onClick={onClick}
-      className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border/70 bg-background/70 px-2 text-xs text-muted-foreground shadow-sm transition-colors hover:border-primary/25 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:gap-2 sm:px-2.5"
+      className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border/70 bg-background/70 px-2 text-xs text-muted-foreground shadow-sm transition-colors hover:border-primary/25 hover:bg-background/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:gap-2 sm:px-2.5"
       title={t('chat:misc.tokensUsed', { count: usedTokens })}
       aria-label={t('chat:misc.showTokenUsage')}
     >
@@ -62,7 +62,7 @@ function TokenUsageSummary({ usage, onClick }: TokenUsageSummaryProps) {
           <span className="block h-full rounded-full bg-primary" style={{ width: `${usedRatio * 100}%` }} />
         </span>
       )}
-      <span className="grid h-5 w-5 place-items-center rounded-md bg-primary/10 text-primary">
+      <span className="grid h-5 w-5 place-items-center text-primary">
         <ActivityIcon className="h-3.5 w-3.5" />
       </span>
       <span className="font-medium text-foreground">{formatTokenCount(usedTokens)}</span>

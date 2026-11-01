@@ -10,7 +10,7 @@ type AgentCategoryTabsSectionProps = {
   onSelectCategory: (category: AgentCategory) => void;
 };
 
-/** Rendered by AgentsSettingsTab to switch between the selected provider's categories. */
+/** Rendered by AgentSettingsLayer to switch between the open provider's categories. */
 export default function AgentCategoryTabsSection({
   categories,
   selectedAgent,
@@ -20,8 +20,8 @@ export default function AgentCategoryTabsSection({
   const { t } = useTranslation('settings');
 
   return (
-    <div className="flex-shrink-0 border-b border-border">
-      <div role="tablist" className="flex overflow-x-auto px-2 md:px-4">
+    <div className="flex-shrink-0">
+      <div role="tablist" className="scrollbar-hide flex overflow-x-auto px-2 md:px-4">
         {categories.map((category) => (
           <button
             key={category}
@@ -29,7 +29,7 @@ export default function AgentCategoryTabsSection({
             aria-selected={selectedCategory === category}
             onClick={() => onSelectCategory(category)}
             className={cn(
-              'whitespace-nowrap border-b-2 px-4 py-3 text-sm font-medium touch-manipulation transition-colors duration-150',
+              '-mb-px whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium touch-manipulation transition-colors duration-150 md:px-4',
               selectedCategory === category
                 ? 'border-primary text-primary'
                 : 'border-transparent text-muted-foreground hover:text-foreground',

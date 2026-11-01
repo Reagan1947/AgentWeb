@@ -136,7 +136,7 @@ export default function SidebarProjectSessions({
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-7 px-1.5 text-xs uppercase text-red-600 hover:bg-red-50 hover:text-red-600 dark:text-red-400 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+                  className="h-7 px-1.5 text-[11px] uppercase text-red-600 hover:bg-red-50 hover:text-red-600 dark:text-red-400 dark:hover:bg-red-900/20 dark:hover:text-red-400"
                   onClick={() => onDeleteSelectedSessions(effectiveSelectedIds)}
                 >
                   {`Delete (${effectiveSelectedIds.length})`}
@@ -145,7 +145,7 @@ export default function SidebarProjectSessions({
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-7 px-1.5 text-xs uppercase text-muted-foreground hover:text-foreground"
+                className="h-7 px-1.5 text-[11px] uppercase text-muted-foreground hover:text-foreground"
                 onClick={() =>
                   onSetSessionSelection({
                     projectId: project.projectId,
@@ -160,7 +160,7 @@ export default function SidebarProjectSessions({
             <Button
               variant="ghost"
               size="sm"
-              className="ml-auto h-7 px-2 text-xs uppercase text-muted-foreground hover:text-foreground"
+              className="ml-auto h-7 px-2 text-[11px] uppercase text-muted-foreground hover:text-foreground"
               onClick={onCancelSessionSelection}
             >
               {t('actions.cancel')}

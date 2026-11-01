@@ -127,6 +127,7 @@
     "label": "הגדרות",
     "agents": "סוכנים",
     "appearance": "מראה",
+    "commands": "פקודות",
     "git": "Git",
     "apiTokens": "API וטוקנים",
     "voice": "קול",
@@ -376,6 +377,9 @@
     }
   },
   "agents": {
+    "list": {
+      "description": "בחרו סוכן כדי לנהל את החשבון, ההרשאות והכלים שלו."
+    },
     "authStatus": {
       "checking": "בודק…",
       "connected": "מחובר",

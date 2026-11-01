@@ -95,16 +95,14 @@ export function asyncHandler(
 // ---------------------------
 //----------------- QUEUED CHAT MESSAGE UTILITIES ------------
 /**
- * Reads a stored queued chat message (the parsed JSON of
- * `session_drafts.queued_message`), or returns null when it has nothing to
- * send: no text and no attachments.
+ * Reads one stored queued chat message, or returns null when it has nothing
+ * to send: no text and no attachments.
  *
- * Used by the Database module's drafts repository, which appends a follow-up
- * to the waiting message, and by the Scheduled Messages dispatcher, which sends
- * it. Both must read a stored message the same way, or a merge could keep what
- * the dispatcher then ignores. Rows from before attachments existed hold
- * image-only descriptors in `images`; they are read as `attachments`.
- * `options` is kept only when it is a plain object.
+ * Used by the Database module's drafts repository and by the Scheduled
+ * Messages dispatcher, which sends one queued turn. Both must read a stored
+ * message the same way. Rows from before attachments existed hold image-only
+ * descriptors in `images`; they are read as `attachments`. `options` is kept
+ * only when it is a plain object. `id` is kept when it is a non-empty string.
  */
 export function readQueuedChatMessage(value: unknown): QueuedChatMessage | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -123,7 +121,24 @@ export function readQueuedChatMessage(value: unknown): QueuedChatMessage | null 
   const options = record.options && typeof record.options === 'object' && !Array.isArray(record.options)
     ? record.options as Record<string, unknown>
     : undefined;
-  return { content, ...(options ? { options } : {}), attachments };
+  const id = typeof record.id === 'string' && record.id.trim() ? record.id.trim() : undefined;
+  return { ...(id ? { id } : {}), content, ...(options ? { options } : {}), attachments };
+}
+
+/**
+ * Reads the ordered queue stored in `session_drafts.queued_message`.
+ *
+ * The column holds a JSON array of messages. A row written before the queue
+ * was a list holds one message object; that row is read as a one-entry queue.
+ * Empty entries are dropped. Used by the Database module's drafts repository,
+ * which owns the list the dispatcher sends from.
+ */
+export function readQueuedChatMessages(value: unknown): QueuedChatMessage[] {
+  const entries = Array.isArray(value) ? value : [value];
+  return entries.flatMap((entry) => {
+    const message = readQueuedChatMessage(entry);
+    return message ? [message] : [];
+  });
 }
 
 // ---------------------------

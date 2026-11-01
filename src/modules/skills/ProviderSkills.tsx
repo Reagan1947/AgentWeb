@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import {
   CheckCircle2,
-  FileCode2,
   FileText,
   FileUp,
   FolderUp,
@@ -500,17 +499,9 @@ export default function ProviderSkills({ selectedProvider, currentProjects }: Pr
 
   return (
     <div className="min-w-0 space-y-4 overflow-x-hidden">
-      <div className="flex min-w-0 items-start gap-3">
-        <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border/70 bg-muted/20 text-muted-foreground">
-          <FileCode2 className="h-4 w-4" strokeWidth={1.7} />
-        </div>
-        <div className="min-w-0 space-y-1">
-          <h3 className="text-lg font-medium text-foreground">{t('tabs.skills', { defaultValue: 'Skills' })}</h3>
-          <p className="text-sm text-muted-foreground">
-            {t('skillsPage.description', { provider: providerName })}
-          </p>
-        </div>
-      </div>
+      <p className="text-sm text-muted-foreground">
+        {t('skillsPage.description', { provider: providerName })}
+      </p>
 
       <div className="space-y-2">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">

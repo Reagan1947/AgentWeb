@@ -8,10 +8,11 @@ import {
   MonitorPlay,
   Palette,
   Plug,
+  Terminal,
 } from 'lucide-react';
 import type { ComponentType } from 'react';
 
-import type { FileStatusCode, LLMProvider, McpProvider, McpScope, McpTransport, SettingsMainTab } from '@/shared/types';
+import type { AgentProvider, FileStatusCode, LLMProvider, McpProvider, McpScope, McpTransport, SettingsMainTab } from '@/shared/types';
 import type { UserPreferenceKey } from '@/shared/userSettings';
 
 /** The four buckets the git changes view sorts working-tree files into. */
@@ -109,7 +110,8 @@ type SettingsMainTabMeta = {
  */
 export const SETTINGS_MAIN_TABS: SettingsMainTabMeta[] = [
   { id: 'agents', label: 'Agents', keywords: 'agents subagents claude code', icon: Bot },
-  { id: 'appearance', label: 'Appearance', keywords: 'appearance theme dark light language', icon: Palette },
+  { id: 'appearance', label: 'Appearance', keywords: 'appearance theme dark light language thinking parameters', icon: Palette },
+  { id: 'commands', label: 'Commands', keywords: 'commands slash skills builtins', icon: Terminal },
   { id: 'git', label: 'Git', keywords: 'git github commits', icon: GitBranch },
   { id: 'api', label: 'API Tokens', keywords: 'api tokens auth keys', icon: KeyRound },
   { id: 'tasks', label: 'Tasks', keywords: 'tasks taskmaster', icon: ListChecks },
@@ -118,6 +120,17 @@ export const SETTINGS_MAIN_TABS: SettingsMainTabMeta[] = [
   { id: 'plugins', label: 'Plugins', keywords: 'plugins extensions integrations', icon: Plug },
   { id: 'about', label: 'About', keywords: 'about version info', icon: Info },
 ];
+
+/**
+ * Display names for the CLI agents configured under Settings → Agents.
+ * The agents list, the agent settings layer, and the account panel all use these labels.
+ */
+export const AGENT_PROVIDER_NAMES: Record<AgentProvider, string> = {
+  claude: 'Claude',
+  cursor: 'Cursor',
+  codex: 'Codex',
+  opencode: 'OpenCode',
+};
 
 // ---------------------------
 
@@ -204,17 +217,6 @@ export const MCP_SUPPORTS_WORKING_DIRECTORY: Record<McpProvider, boolean> = {
 
 // ---------------------------
 
-//----------------- QUICK SETTINGS PANEL ROWS ------------
-
-/**
- * Class list for one row in the quick settings panel. Shared so plain rows and the clickable
- * toggle row (which appends `cursor-pointer`) stay visually identical.
- */
-export const SETTING_ROW_CLASS =
-  'flex items-center justify-between p-3 rounded-lg bg-muted/60 hover:bg-accent transition-colors border border-transparent hover:border-border';
-
-// ---------------------------
-
 //----------------- TERMINAL TIMING ------------
 
 /**
@@ -271,3 +273,15 @@ export const PROVIDER_PERMISSION_PREFERENCE_KEYS: Record<LLMProvider, UserPrefer
   codex: 'codexPermissions',
   opencode: 'opencodePermissions',
 };
+
+// ---------------------------
+
+//----------------- SIDEBAR SELECTION ------------
+
+/**
+ * Fill for the open session in the project list and the recent-conversations
+ * list. Light mode keeps one even #dbdbdc wash with ink text. Dark mode uses
+ * #2b2b2b with white text. Hover repeats the same fill so the row stays one color.
+ */
+export const SELECTED_SESSION_ROW_CLASS =
+  'bg-[#dbdbdc] text-[#1d1d1f] hover:bg-[#dbdbdc] dark:bg-[#2b2b2b] dark:text-[#ffffff] dark:hover:bg-[#2b2b2b]';

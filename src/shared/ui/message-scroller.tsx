@@ -1,7 +1,5 @@
 import * as React from 'react';
-import { ArrowDownIcon } from 'lucide-react';
 
-import { Button } from '@/shared/ui/Button';
 import { cn } from '@/shared/utils';
 
 type MessageScrollerContextValue = {
@@ -27,8 +25,7 @@ type MessageScrollerProviderProps = {
  * Owns the transcript viewport ref. Used by the chat message pane.
  *
  * Opening position, streamed follow and history prepend stay in the chat
- * session hook, which already drives this viewport. The provider only shares
- * the element with the jump button.
+ * session hook, which already drives this viewport through the forwarded ref.
  */
 export function MessageScrollerProvider({ children }: MessageScrollerProviderProps) {
   const viewportRef = React.useRef<HTMLDivElement | null>(null);
@@ -36,7 +33,7 @@ export function MessageScrollerProvider({ children }: MessageScrollerProviderPro
   return <MessageScrollerContext.Provider value={value}>{children}</MessageScrollerContext.Provider>;
 }
 
-/** Frame around the transcript viewport and its jump button. Used by the chat message pane. */
+/** Frame around the transcript viewport. Used by the chat message pane. */
 export function MessageScroller({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
@@ -106,72 +103,5 @@ export function MessageScrollerItem({
       className={cn('min-w-0 shrink-0', className)}
       {...props}
     />
-  );
-}
-
-type MessageScrollerButtonProps = React.ComponentProps<typeof Button> & {
-  direction?: 'start' | 'end';
-};
-
-/** Jumps to the start or the live edge of the transcript. Used by the chat message pane. */
-export function MessageScrollerButton({
-  direction = 'end',
-  className,
-  children,
-  ...props
-}: MessageScrollerButtonProps) {
-  const { viewportRef } = useMessageScrollerContext();
-  // Shown only while the live edge is below the viewport, so the control stays out of the way when the reader is already there.
-  const [canJump, setCanJump] = React.useState(false);
-
-  React.useEffect(() => {
-    const viewport = viewportRef.current;
-    if (!viewport) {
-      return undefined;
-    }
-    const update = () => {
-      const distance = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
-      setCanJump(direction === 'end' ? distance > 80 : viewport.scrollTop > 80);
-    };
-    update();
-    viewport.addEventListener('scroll', update, { passive: true });
-    return () => viewport.removeEventListener('scroll', update);
-  }, [direction, viewportRef]);
-
-  if (!canJump) {
-    return null;
-  }
-
-  return (
-    <Button
-      data-slot="message-scroller-button"
-      data-direction={direction}
-      type="button"
-      variant="secondary"
-      size="icon"
-      className={cn(
-        'absolute left-1/2 z-20 h-8 w-8 -translate-x-1/2 shadow-sm',
-        direction === 'end' ? 'bottom-4' : 'top-4',
-        className,
-      )}
-      onClick={() => {
-        const viewport = viewportRef.current;
-        if (!viewport) {
-          return;
-        }
-        viewport.scrollTo({
-          top: direction === 'end' ? viewport.scrollHeight : 0,
-          behavior: 'smooth',
-        });
-      }}
-      {...props}
-    >
-      {children ?? (
-        <>
-          <ArrowDownIcon className={direction === 'start' ? 'rotate-180' : undefined} />
-          <span className="sr-only">{direction === 'end' ? 'Scroll to end' : 'Scroll to start'}</span>
-        </>
-      )}
-    </Button>
   );
 }

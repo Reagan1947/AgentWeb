@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Bot,
@@ -26,6 +26,7 @@ type BrowserUseStatus = {
   playwrightInstalled: boolean;
   chromiumInstalled: boolean;
   installInProgress: boolean;
+  steelReachable?: boolean;
   sessionCount: number;
   message: string;
 };
@@ -42,6 +43,8 @@ type BrowserUseSession = {
   message: string | null;
   createdBy: 'agent';
   profileName: string | null;
+  provider: 'steel' | 'playwright' | null;
+  debugUrl: string | null;
   viewport: {
     width: number;
     height: number;
@@ -139,6 +142,7 @@ function getStatusDot(status: BrowserUseSession['status']): string {
 }
 
 const PROMPT_KEYS = ['browserUse.prompt1', 'browserUse.prompt2'];
+const SESSION_POLL_INTERVAL_MS = 2000;
 
 /** Used by the project-workspace module to render the Browser tab's session list and live preview. */
 export default function BrowserUsePanel({ isVisible, onShowSettings }: BrowserUsePanelProps) {
@@ -151,6 +155,10 @@ export default function BrowserUsePanel({ isVisible, onShowSettings }: BrowserUs
   const [isInstalling, setIsInstalling] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Ignores a session poll that finishes after the tab hides or a newer load starts.
+  const refreshGeneration = useRef(0);
+  // Keeps the background poll from replacing a manual refresh that is still in flight.
+  const manualRefresh = useRef(false);
 
   const selectedSession = useMemo(
     () => sessions.find((session) => session.id === selectedSessionId) || sessions[0] || null,
@@ -158,7 +166,11 @@ export default function BrowserUsePanel({ isVisible, onShowSettings }: BrowserUs
   );
 
   const activeSessions = sessions.filter((session) => session.status === 'ready');
-  const needsBrowserBinaries = Boolean(status?.enabled && (!status.playwrightInstalled || !status.chromiumInstalled));
+  const needsBrowserBinaries = Boolean(
+    status?.enabled
+    && !status.available
+    && (!status.playwrightInstalled || (!status.chromiumInstalled && !status.steelReachable)),
+  );
   const runtimeLabel = !status?.enabled
     ? t('browserUse.runtimeDisabled')
     : status.available
@@ -174,8 +186,17 @@ export default function BrowserUsePanel({ isVisible, onShowSettings }: BrowserUs
     }
     : null;
 
-  const refresh = useCallback(async () => {
-    setIsRefreshing(true);
+  const refresh = useCallback(async (options?: { silent?: boolean }) => {
+    if (options?.silent && manualRefresh.current) {
+      return;
+    }
+
+    const generation = refreshGeneration.current + 1;
+    refreshGeneration.current = generation;
+    if (!options?.silent) {
+      manualRefresh.current = true;
+      setIsRefreshing(true);
+    }
     try {
       const [statusResponse, sessionsResponse] = await Promise.all([
         api.browserUse.status(),
@@ -183,6 +204,9 @@ export default function BrowserUsePanel({ isVisible, onShowSettings }: BrowserUs
       ]);
       const statusData = await readApiJson<{ data: BrowserUseStatus }>(statusResponse);
       const sessionsData = await readApiJson<{ data: { sessions: BrowserUseSession[] } }>(sessionsResponse);
+      if (refreshGeneration.current !== generation) {
+        return;
+      }
       const nextSessions = sessionsData.data.sessions;
       setStatus(statusData.data);
       setSessions(nextSessions);
@@ -193,15 +217,31 @@ export default function BrowserUsePanel({ isVisible, onShowSettings }: BrowserUs
       ));
       setError(null);
     } catch (err) {
+      if (refreshGeneration.current !== generation || options?.silent) {
+        return;
+      }
       setError(localizeApiError(err, 'browserUse.loadFailed', t));
     } finally {
-      setIsRefreshing(false);
+      if (!options?.silent && refreshGeneration.current === generation) {
+        manualRefresh.current = false;
+        setIsRefreshing(false);
+      }
     }
   }, [t]);
 
   useEffect(() => {
-    if (!isVisible) return;
+    if (!isVisible) {
+      return undefined;
+    }
+
     void refresh();
+    const timer = window.setInterval(() => {
+      void refresh({ silent: true });
+    }, SESSION_POLL_INTERVAL_MS);
+    return () => {
+      refreshGeneration.current += 1;
+      window.clearInterval(timer);
+    };
   }, [isVisible, refresh]);
 
   const runAction = useCallback(async (action: () => Promise<void>) => {
@@ -330,9 +370,24 @@ export default function BrowserUsePanel({ isVisible, onShowSettings }: BrowserUs
     </div>
   );
 
+  const hasLiveView = Boolean(selectedSession?.status === 'ready' && selectedSession.debugUrl);
+  const canExpand = Boolean(hasLiveView || selectedSession?.screenshotDataUrl);
+
   const renderBrowserSurface = (fullscreen = false) => (
-    <div className={cn('flex flex-1 items-center justify-center bg-neutral-950', fullscreen ? 'min-h-[80vh]' : 'min-h-[420px]')}>
-      {selectedSession?.screenshotDataUrl ? (
+    <div className={cn(
+      'flex w-full flex-1 flex-col bg-neutral-950',
+      hasLiveView ? 'items-stretch' : 'items-center justify-center',
+      fullscreen ? 'min-h-0' : 'min-h-[420px]',
+    )}>
+      {hasLiveView && selectedSession?.debugUrl ? (
+        <iframe
+          src={selectedSession.debugUrl}
+          title={t('browserUse.liveViewTitle')}
+          referrerPolicy="no-referrer"
+          allow="clipboard-read; clipboard-write; fullscreen"
+          className={cn('h-full w-full flex-1 border-0 bg-neutral-950', fullscreen ? 'min-h-0' : 'min-h-[420px]')}
+        />
+      ) : selectedSession?.screenshotDataUrl ? (
         <div className="relative inline-block max-h-full">
           <img
             src={selectedSession.screenshotDataUrl}
@@ -446,7 +501,7 @@ export default function BrowserUsePanel({ isVisible, onShowSettings }: BrowserUs
             renderEmptyState()
           ) : (
             <div className="min-h-0 flex-1 overflow-auto bg-muted/20 p-4">
-              <div className="mx-auto flex min-h-[500px] max-w-7xl flex-col overflow-hidden rounded-md border border-border bg-background shadow-sm">
+              <div className="mx-auto flex h-full min-h-[500px] max-w-7xl flex-col overflow-hidden rounded-md border border-border bg-background shadow-sm">
                 <div className="flex flex-wrap items-center gap-2 border-b border-border/60 px-3 py-2">
                   <Badge variant="outline" className={selectedSession ? cn('text-[10px]', getStatusTone(selectedSession.status)) : 'text-[10px]'}>
                     {getStatusLabel(selectedSession?.status, t)}
@@ -463,7 +518,7 @@ export default function BrowserUsePanel({ isVisible, onShowSettings }: BrowserUs
                   <div className="hidden text-xs text-muted-foreground md:block">
                     {formatAction(selectedSession?.lastAction || null, t)}
                   </div>
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setIsFullscreen(true)} disabled={!selectedSession?.screenshotDataUrl} title={t('browserUse.fullScreen')} aria-label={t('browserUse.fullScreen')}>
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setIsFullscreen(true)} disabled={!canExpand} title={t('browserUse.fullScreen')} aria-label={t('browserUse.fullScreen')}>
                     <Expand className="h-4 w-4" />
                   </Button>
                   <Button variant="ghost" size="sm" className="h-8 w-8 p-0 lg:hidden" onClick={stopSession} disabled={isBusy || !selectedSession || selectedSession.status !== 'ready'} title={t('browserUse.stopSession')} aria-label={t('browserUse.stopSession')}>
@@ -519,6 +574,16 @@ export default function BrowserUsePanel({ isVisible, onShowSettings }: BrowserUs
                   <span>{t('browserUse.profileLabel')}</span>
                   <span className="truncate font-medium text-foreground">{selectedSession?.profileName || t('browserUse.temporaryProfile')}</span>
                 </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span>{t('browserUse.providerLabel')}</span>
+                  <span className="truncate font-medium text-foreground">
+                    {selectedSession?.provider === 'steel'
+                      ? t('browserUse.providerSteel')
+                      : selectedSession?.provider === 'playwright'
+                        ? t('browserUse.providerLocal')
+                        : t('browserUse.none')}
+                  </span>
+                </div>
               </div>
               <div className="mt-3 grid grid-cols-2 gap-2">
                 <Button variant="outline" size="sm" onClick={stopSession} disabled={isBusy || !selectedSession || selectedSession.status !== 'ready'}>
@@ -536,7 +601,7 @@ export default function BrowserUsePanel({ isVisible, onShowSettings }: BrowserUs
       </div>
 
       {isFullscreen && selectedSession && (
-        <div className="fixed inset-0 z-50 bg-black/90 p-6">
+        <div className="modal-backdrop fixed inset-0 z-50 p-6">
           <div className="flex h-full flex-col rounded-md border border-white/10 bg-black">
             <div className="flex items-center justify-between border-b border-white/10 px-4 py-3 text-sm text-white/80">
               <div className="min-w-0 truncate">{selectedSession.title || selectedSession.url || t('browserUse.sessionFallback')}</div>

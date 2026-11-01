@@ -10,8 +10,10 @@ export type PaletteOps = {
   openDirectory: (path: string) => void;
   openSettings: (tab?: string) => void;
   refreshProjects: () => Promise<void> | void;
-  // Appends text to the chat composer and focuses it (used by the quick
-  // settings Commands tab to hand a picked slash command to the composer).
+  // Switches the workspace to the chat tab so an inserted slash command is visible.
+  showChat: () => void;
+  // Appends text to the chat composer and focuses it. The settings Commands
+  // tab uses it to hand a picked slash command to the composer.
   insertComposerText: (text: string) => void;
 };
 
@@ -25,10 +27,11 @@ const defaultOps: PaletteOps = {
   openDirectory: () => undefined,
   openSettings: () => undefined,
   refreshProjects: () => undefined,
+  showChat: () => undefined,
   insertComposerText: () => undefined,
 };
 
-/** Mounted by the project-workspace module so CommandPalette and the chat, code-editor and sidebar modules share one set of palette operations. */
+/** Mounted by the project-workspace module so the command palette, chat, code editor, settings and sidebar modules share one set of palette operations. */
 export function PaletteOpsProvider({ children }: { children: ReactNode }) {
   const ref = useRef<Partial<PaletteOps>>({});
   return <PaletteOpsContext.Provider value={ref}>{children}</PaletteOpsContext.Provider>;
@@ -44,6 +47,7 @@ export function usePaletteOps(): PaletteOps {
       openDirectory: (path) => (ref?.current.openDirectory ?? defaultOps.openDirectory)(path),
       openSettings: (tab) => (ref?.current.openSettings ?? defaultOps.openSettings)(tab),
       refreshProjects: () => (ref?.current.refreshProjects ?? defaultOps.refreshProjects)(),
+      showChat: () => (ref?.current.showChat ?? defaultOps.showChat)(),
       insertComposerText: (text) =>
         (ref?.current.insertComposerText ?? defaultOps.insertComposerText)(text),
     }),
@@ -59,6 +63,7 @@ export function usePaletteOpsRegister(partial: Partial<PaletteOps>) {
     openDirectory,
     openSettings,
     refreshProjects,
+    showChat,
     insertComposerText,
   } = partial;
 
@@ -74,6 +79,7 @@ export function usePaletteOpsRegister(partial: Partial<PaletteOps>) {
     if (openDirectory) registry.openDirectory = openDirectory;
     if (openSettings) registry.openSettings = openSettings;
     if (refreshProjects) registry.refreshProjects = refreshProjects;
+    if (showChat) registry.showChat = showChat;
     if (insertComposerText) registry.insertComposerText = insertComposerText;
     return () => {
       if (openFile && registry.openFile === openFile) registry.openFile = prev.openFile;
@@ -81,7 +87,8 @@ export function usePaletteOpsRegister(partial: Partial<PaletteOps>) {
       if (openDirectory && registry.openDirectory === openDirectory) registry.openDirectory = prev.openDirectory;
       if (openSettings && registry.openSettings === openSettings) registry.openSettings = prev.openSettings;
       if (refreshProjects && registry.refreshProjects === refreshProjects) registry.refreshProjects = prev.refreshProjects;
+      if (showChat && registry.showChat === showChat) registry.showChat = prev.showChat;
       if (insertComposerText && registry.insertComposerText === insertComposerText) registry.insertComposerText = prev.insertComposerText;
     };
-  }, [ref, openFile, openFileInEditor, openDirectory, openSettings, refreshProjects, insertComposerText]);
+  }, [ref, openFile, openFileInEditor, openDirectory, openSettings, refreshProjects, showChat, insertComposerText]);
 }

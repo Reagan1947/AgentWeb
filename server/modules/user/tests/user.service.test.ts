@@ -9,7 +9,8 @@ const noDrafts: UserDependencies['drafts'] = {
   getDrafts: () => [],
   saveDraft: () => undefined,
   saveDraftText: () => undefined,
-  appendQueuedMessage: (_userId, _scope, message) => ({ queuedMessage: message, appended: false }),
+  appendQueuedMessage: (_userId, _scope, message) => ({ queuedMessages: [message] }),
+  removeQueuedMessage: () => undefined,
   clearQueuedMessage: () => undefined,
   deleteDraft: () => undefined,
 };
@@ -150,14 +151,14 @@ test('saveDraft with an explicit null queued message still clears it', () => {
   assert.deepEqual(saved, [[5, 'session-1', { text: 'typing', queuedMessage: null }]]);
 });
 
-test('appendQueuedMessage hands the repository the message and returns what is now queued', () => {
+test('appendQueuedMessage hands the repository the message and returns the queue', () => {
   const appended: unknown[][] = [];
   const service = createUserService(createDependencies({
     drafts: {
       ...noDrafts,
       appendQueuedMessage: (...args) => {
         appended.push(args);
-        return { queuedMessage: { content: 'A\n\nB', attachments: [] }, appended: true };
+        return { queuedMessages: [{ id: 'b', content: 'B', attachments: [] }] };
       },
     },
   }));
@@ -167,17 +168,16 @@ test('appendQueuedMessage hands the repository the message and returns what is n
     options: { model: 'opus' },
     attachments: [{ name: 'b.txt' }],
     stray: 'dropped',
-  });
+  }, 1);
 
   assert.deepEqual(appended, [[5, 'session-1', {
     content: 'B',
     options: { model: 'opus' },
     attachments: [{ name: 'b.txt' }],
-  }]]);
+  }, 1]]);
   assert.deepEqual(result, {
     success: true,
-    queuedMessage: { content: 'A\n\nB', attachments: [] },
-    appended: true,
+    queuedMessages: [{ id: 'b', content: 'B', attachments: [] }],
   });
 });
 
@@ -189,21 +189,15 @@ test('appendQueuedMessage refuses a message with nothing to send, or a bad scope
   assert.throws(() => service.appendQueuedMessage(5, '   ', { content: 'B' }), /scope/i);
 });
 
-test('appendQueuedMessage refuses, as a conflict, a slash command the repository cannot combine', () => {
+test('removeQueuedMessage removes the named turn and refuses a missing id', () => {
+  const removed: unknown[][] = [];
   const service = createUserService(createDependencies({
-    drafts: { ...noDrafts, appendQueuedMessage: () => null },
+    drafts: { ...noDrafts, removeQueuedMessage: (...args) => { removed.push(args); } },
   }));
 
-  assert.throws(
-    () => service.appendQueuedMessage(5, 'session-1', { content: '/compact', attachments: [] }),
-    (error: unknown) => {
-      const appError = error as { code?: string; statusCode?: number; message?: string };
-      assert.equal(appError.code, 'QUEUED_MESSAGE_NOT_COMBINABLE');
-      assert.equal(appError.statusCode, 409);
-      assert.match(appError.message ?? '', /slash command/);
-      return true;
-    },
-  );
+  assert.deepEqual(service.removeQueuedMessage(5, 'session-1', 'turn-b'), { success: true });
+  assert.deepEqual(removed, [[5, 'session-1', 'turn-b']]);
+  assert.throws(() => service.removeQueuedMessage(5, 'session-1', '  '), /id/i);
 });
 
 test('clearQueuedMessage clears the named scope', () => {

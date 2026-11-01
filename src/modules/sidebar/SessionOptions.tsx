@@ -169,13 +169,14 @@ export default function SessionOptions({
       size="icon"
       onOpenChange={setOptionsOpen}
       triggerClassName="h-7 w-7 text-muted-foreground opacity-70 hover:bg-muted hover:opacity-100"
-      menuClassName="w-[260px] rounded-xl p-1.5 shadow-xl"
+      compact
+      menuClassName="w-[260px] rounded-xl p-1 shadow-xl"
       header={(
-        <div className="mb-1 border-b border-border px-3 py-2">
-          <p className="truncate text-xs font-medium text-foreground" title={sessionName}>
+        <div className="mb-1 border-b border-border px-2.5 py-1.5">
+          <p className="truncate text-[11px] font-medium leading-4 text-foreground" title={sessionName}>
             {sessionName}
           </p>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">{providerLabel} session</p>
+          <p className="mt-0.5 text-[9px] leading-3 text-muted-foreground">{providerLabel} session</p>
         </div>
       )}
       items={[

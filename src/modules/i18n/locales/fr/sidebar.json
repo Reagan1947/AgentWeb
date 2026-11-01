@@ -20,7 +20,7 @@
     "runClaudeCli": "Exécutez le CLI Claude dans un répertoire de projet pour commencer"
   },
   "app": {
-    "title": "CloudCLI",
+    "title": "AgentWeb",
     "subtitle": "Interface d'assistant de codage IA"
   },
   "sessions": {
@@ -33,7 +33,7 @@
     "unnamed": "Sans nom",
     "loading": "Chargement...",
     "showMore": "Afficher plus de sessions",
-    "select": "Sélectionner",
+    "select": "Gérer la session",
     "selectAll": "Tout sélectionner",
     "selectAllLoaded": "Sélectionner les chargées",
     "clearSelection": "Tout désélectionner",
@@ -74,7 +74,6 @@
     "save": "Enregistrer",
     "delete": "Supprimer",
     "rename": "Renommer",
-    "joinCommunity": "Rejoindre la communauté",
     "reportIssue": "Signaler un problème",
     "starOnGithub": "Étoile sur GitHub"
   },

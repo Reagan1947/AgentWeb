@@ -2,6 +2,7 @@ import { memo, type KeyboardEvent, type ReactNode } from 'react';
 import { Loader2 } from 'lucide-react';
 import type { TFunction } from 'i18next';
 
+import { SELECTED_SESSION_ROW_CLASS } from '@/shared/constants';
 import { ActionMenuButton, Badge, Checkbox, LLMProviderLogo, Tooltip, buttonVariants } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 import type { LLMProvider, Project, ProjectSession, SessionWithProvider } from '@/shared/types';
@@ -125,9 +126,30 @@ function SidebarSessionItem({
   // The highlight lives on the wrapper so it covers the row and that button.
   // The row's own fill would stop short of the button and leave a gap.
   // Hover matches the selected fill. Selection still recolors the label; hover does not.
+  // One 16px line, same as the project name, so that fill stays the project row's height.
+  const sessionTrailing = (isProcessing || compactSessionAge || sessionView.messageCount > 0) ? (
+    <span className={cn('ml-auto flex h-4 shrink-0 items-center gap-1 transition-opacity duration-200', isEditing && 'opacity-0')}>
+      {sessionView.messageCount > 0 && (
+        <Badge variant="secondary" className="h-4 border-0 px-1 py-0 text-[11px] leading-4">
+          {sessionView.messageCount}
+        </Badge>
+      )}
+      {isProcessing ? (
+        <Tooltip content={t('tooltips.processingSessionIndicator', 'Processing session')} position="top">
+          <span className="flex h-4 w-4 items-center justify-center rounded-md text-muted-foreground">
+            <Loader2 className="h-3 w-3 animate-spin" />
+          </span>
+        </Tooltip>
+      ) : compactSessionAge && (
+        <span className="text-[11px] leading-4 text-muted-foreground">
+          {compactSessionAge}
+        </span>
+      )}
+    </span>
+  ) : null;
   const sessionHighlightClass = cn(
     'hover:bg-accent',
-    isSelected && 'bg-accent text-accent-foreground hover:bg-accent',
+    isSelected && SELECTED_SESSION_ROW_CLASS,
     isChecked && 'bg-primary/10',
   );
   const withSessionMenu = (row: ReactNode) => (
@@ -177,7 +199,7 @@ function SidebarSessionItem({
       className={cn(
         'rounded-md p-2 transition-colors active:scale-[0.98]',
         isSelecting ? 'mx-3 my-0.5' : 'min-w-0 flex-1',
-        isSelecting && (isSelected ? 'bg-accent' : 'hover:bg-accent'),
+        isSelecting && (isSelected ? SELECTED_SESSION_ROW_CLASS : 'hover:bg-accent'),
         isSelecting && isChecked && 'bg-primary/10',
       )}
       onClick={isSelecting ? (isSelectable ? toggleSelected : undefined) : selectMobileSession}
@@ -186,42 +208,24 @@ function SidebarSessionItem({
         {selectionControl}
         <div
           className={cn(
-            'w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0',
-            isSelected ? 'bg-primary/10' : 'bg-muted/50',
+            'flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-md',
+            isSelected ? 'bg-transparent' : 'bg-muted/50',
           )}
         >
           <LLMProviderLogo provider={session.__provider} className="h-3 w-3" />
         </div>
 
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <div
-              className="min-w-0 flex-1 truncate text-xs font-normal text-foreground"
-              title={sessionView.sessionName}
-            >
-              {sessionView.sessionName}
-            </div>
-            {isProcessing ? (
-              <span className={cn('ml-auto flex-shrink-0', isEditing && 'opacity-0')}>
-                <Tooltip content={t('tooltips.processingSessionIndicator', 'Processing session')} position="top">
-                  <span className="flex h-5 w-5 items-center justify-center rounded-md text-muted-foreground">
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  </span>
-                </Tooltip>
-              </span>
-            ) : compactSessionAge && (
-              <span className={cn('ml-auto flex-shrink-0 text-[11px] text-muted-foreground', isEditing && 'opacity-0')}>
-                {compactSessionAge}
-              </span>
+        <div className="flex h-4 min-w-0 flex-1 items-center gap-2">
+          <div
+            className={cn(
+              'min-w-0 flex-1 truncate text-xs font-normal leading-4',
+              isSelected ? 'text-inherit' : 'text-foreground',
             )}
+            title={sessionView.sessionName}
+          >
+            {sessionView.sessionName}
           </div>
-          <div className="mt-0.5 flex items-center">
-            {sessionView.messageCount > 0 && (
-              <Badge variant="secondary" className="px-1 py-0 text-xs">
-                {sessionView.messageCount}
-              </Badge>
-            )}
-          </div>
+          {sessionTrailing}
         </div>
       </div>
     </div>
@@ -229,11 +233,11 @@ function SidebarSessionItem({
 
   const desktopRowClassName = cn(
     buttonVariants({ variant: 'ghost' }),
-    'h-auto justify-start rounded-md bg-transparent p-2 text-left font-normal shadow-none hover:text-inherit',
+    'h-auto justify-start rounded-md bg-transparent p-2 text-left text-xs font-normal leading-4 shadow-none hover:text-inherit',
     isSelecting
       ? 'w-full hover:bg-accent'
       : 'min-w-0 flex-1 hover:bg-transparent active:bg-transparent',
-    isSelecting && isSelected && 'bg-accent text-accent-foreground hover:bg-accent',
+    isSelecting && isSelected && SELECTED_SESSION_ROW_CLASS,
     isSelecting && isChecked && 'bg-primary/10',
   );
   const desktopRowBody = (
@@ -241,42 +245,24 @@ function SidebarSessionItem({
       {selectionControl}
       <div
         className={cn(
-          'flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md',
-          isSelected ? 'bg-primary/10' : 'bg-muted/50',
+          'flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-md',
+          isSelected ? 'bg-transparent' : 'bg-muted/50',
         )}
       >
-        <LLMProviderLogo provider={session.__provider} className="h-3 w-3" />
+        {/* The row uses button styles, which force every svg to 16px. The mark has to override that. */}
+        <LLMProviderLogo provider={session.__provider} className="!h-3 !w-3" />
       </div>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <div
-            className="min-w-0 flex-1 truncate text-xs font-normal text-foreground"
-            title={sessionView.sessionName}
-          >
-            {sessionView.sessionName}
-          </div>
-          {isProcessing ? (
-            <span className={cn('ml-auto flex-shrink-0 transition-opacity duration-200', isEditing && 'opacity-0')}>
-              <Tooltip content={t('tooltips.processingSessionIndicator', 'Processing session')} position="top">
-                <span className="flex h-5 w-5 items-center justify-center rounded-md text-muted-foreground">
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                </span>
-              </Tooltip>
-            </span>
-          ) : compactSessionAge && (
-            <span
-              className={cn(
-                'ml-auto flex-shrink-0 text-[11px] text-muted-foreground transition-opacity duration-200',
-                isEditing && 'opacity-0',
-              )}
-            >
-              {compactSessionAge}
-            </span>
+      <div className="flex h-4 min-w-0 flex-1 items-center gap-2">
+        <div
+          className={cn(
+            'min-w-0 flex-1 truncate text-xs font-normal leading-4',
+            isSelected ? 'text-inherit' : 'text-foreground',
           )}
+          title={sessionView.sessionName}
+        >
+          {sessionView.sessionName}
         </div>
-        <div className="mt-0.5 flex items-center">
-          {sessionView.messageCount > 0 && <Badge variant="secondary" className="px-1 py-0 text-xs">{sessionView.messageCount}</Badge>}
-        </div>
+        {sessionTrailing}
       </div>
     </div>
   );
@@ -305,11 +291,18 @@ function SidebarSessionItem({
 
   return (
     <div className="relative">
-      {/* The row fill is painted after this dot and covers the half that sits
-          on the row's left edge. Keep the dot above that fill, and under the
-          sticky project header (z-10). */}
+      {/* Centered on the project chevron, in the gutter left of this row.
+          Desktop rows sit ml-3+pl-3 under a p-2 arrow, so -translate-x-3
+          lands the 8px dot on that 16px icon. Compact cards use p-3 inside
+          mx-3, and left-1 hits the same center. Stay under the sticky
+          project header (z-10). */}
       {(showAttentionIndicator || showBackgroundIndicator || showRecentIndicator) && (
-        <div className="absolute left-0 top-1/2 z-[1] -translate-x-1 -translate-y-1/2 transform">
+        <div
+          className={cn(
+            'absolute top-1/2 z-[1] -translate-y-1/2 transform',
+            isCompact ? 'left-1' : 'left-0 -translate-x-3',
+          )}
+        >
           <Tooltip content={indicatorLabel} position="right">
             <div
               role="status"

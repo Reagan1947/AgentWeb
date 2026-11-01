@@ -73,7 +73,7 @@ const updateResult = (overrides: Partial<ProviderCliUpdateResult> = {}): Provide
 });
 
 const renderRow = (installedVersion: string | null = '2.1.200') => render(
-  <ProviderCliVersion agent="claude" installedVersion={installedVersion} textClass="" subtextClass="" />,
+  <ProviderCliVersion agent="claude" installedVersion={installedVersion} />,
 );
 
 // What nginx answers after its 60 s read timeout while the updater keeps running.

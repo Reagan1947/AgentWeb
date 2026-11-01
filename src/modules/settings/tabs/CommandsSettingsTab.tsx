@@ -1,9 +1,13 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Search } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import type { SlashCommand } from '@/shared/types';
+import { usePaletteOps } from '@/modules/command-palette';
+import { useProjectSlashCommands } from '@/shared/hooks/useProjectSlashCommands';
+import { useSelectedProvider } from '@/shared/hooks/useSelectedProvider';
+import type { Project, SlashCommand } from '@/shared/types';
 import { isSkillCommand } from '@/shared/utils';
+import SettingsSection from '@/modules/settings/SettingsSection';
 
 type CommandGroupKey = 'builtIn' | 'custom' | 'skills';
 
@@ -13,8 +17,8 @@ type CommandGroup = {
   commands: SlashCommand[];
 };
 
-// Rendering order of the headings, as specified for the Commands tab. (The
-// composer menu groups by namespace instead, so the two orders differ.)
+// Same heading order the old quick-settings Commands tab used. The composer
+// menu groups by namespace instead, so the two orders stay different on purpose.
 const GROUP_ORDER: { key: CommandGroupKey; labelKey: string }[] = [
   { key: 'builtIn', labelKey: 'quickSettings.commands.groups.builtIn' },
   { key: 'custom', labelKey: 'quickSettings.commands.groups.custom' },
@@ -32,25 +36,22 @@ const matchesQuery = (command: SlashCommand, normalizedQuery: string): boolean =
   || (command.description?.toLowerCase().includes(normalizedQuery) ?? false)
 );
 
-type QuickSettingsCommandsTabProps = {
-  hasProject: boolean;
-  commands: SlashCommand[];
-  isLoading: boolean;
-  hasError: boolean;
-  onInsertCommand: (command: SlashCommand) => void;
+type CommandsSettingsTabProps = {
+  selectedProject: Project | null;
+  onClose: () => void;
 };
 
-/** Rendered by QuickSettingsPanelView as the Commands tab: a searchable, grouped list of the project's slash commands. */
-export default function QuickSettingsCommandsTab({
-  hasProject,
-  commands,
-  isLoading,
-  hasError,
-  onInsertCommand,
-}: QuickSettingsCommandsTabProps) {
+/** Rendered by Settings for the "commands" tab: a searchable list of the selected project's slash commands that inserts the chosen one into the chat composer. */
+export default function CommandsSettingsTab({ selectedProject, onClose }: CommandsSettingsTabProps) {
   const { t } = useTranslation('settings');
-  // The search box text; local because it only narrows this list. It lives as
-  // long as the tab does, so a filter survives closing and reopening the panel.
+  const provider = useSelectedProvider();
+  const paletteOps = usePaletteOps();
+  const {
+    commands,
+    isLoading,
+    error: hasError,
+  } = useProjectSlashCommands(selectedProject, provider);
+  // Narrows this list only; it resets when the settings dialog remounts the tab.
   const [query, setQuery] = useState('');
 
   const groups = useMemo<CommandGroup[]>(() => {
@@ -67,6 +68,14 @@ export default function QuickSettingsCommandsTab({
       }))
       .filter((group) => group.commands.length > 0);
   }, [commands, query]);
+
+  const handleInsertCommand = useCallback((command: SlashCommand) => {
+    paletteOps.showChat();
+    paletteOps.insertComposerText(`${command.name} `);
+    onClose();
+  }, [onClose, paletteOps]);
+
+  const hasProject = selectedProject !== null;
 
   const renderStatus = (message: string) => (
     <p className="px-1 py-6 text-center text-sm text-muted-foreground">{message}</p>
@@ -86,11 +95,11 @@ export default function QuickSettingsCommandsTab({
         </h4>
         {group.commands.map((command, index) => (
           <button
-            // A project and a user command can share a name (the server does
-            // not dedupe them), so the position disambiguates the key.
+            // A project command and a user command can share a name, so the
+            // position keeps the key unique.
             key={`${group.key}-${index}-${command.name}`}
             type="button"
-            onClick={() => onInsertCommand(command)}
+            onClick={() => handleInsertCommand(command)}
             title={t('quickSettings.commands.insertTitle', { command: command.name })}
             className="flex w-full flex-col items-start rounded-md px-2 py-1.5 text-left transition-colors hover:bg-accent"
           >
@@ -105,24 +114,22 @@ export default function QuickSettingsCommandsTab({
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-background">
-      <div className="border-b border-border p-3">
-        <label className="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-2 py-1.5 focus-within:border-primary">
-          <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
-          <input
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder={t('quickSettings.commands.searchPlaceholder')}
-            aria-label={t('quickSettings.commands.searchPlaceholder')}
-            disabled={!hasProject}
-            className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
-          />
-        </label>
-      </div>
-      <div className="flex-1 space-y-4 overflow-y-auto overflow-x-hidden p-3">
+    <SettingsSection title={t('quickSettings.tabs.commands')}>
+      <label className="flex items-center gap-2 rounded-lg border border-border bg-card/50 px-3 py-2 focus-within:border-primary">
+        <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+        <input
+          type="search"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder={t('quickSettings.commands.searchPlaceholder')}
+          aria-label={t('quickSettings.commands.searchPlaceholder')}
+          disabled={!hasProject}
+          className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+        />
+      </label>
+      <div className="space-y-4">
         {renderBody()}
       </div>
-    </div>
+    </SettingsSection>
   );
 }

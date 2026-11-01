@@ -125,6 +125,9 @@
     "placeholderDefault": "输入您的消息...",
     "disabled": "输入已禁用",
     "attachFiles": "附加文件",
+    "toolsMenu": "附加文件或显示命令",
+    "searchCommands": "搜索命令",
+    "noMatchingCommands": "没有匹配的命令",
     "attachImages": "附加图片",
     "send": "发送",
     "stop": "停止",
@@ -145,7 +148,11 @@
       "label": "已排队",
       "willSend": "将在当前完成后发送",
       "edit": "编辑排队消息",
-      "delete": "删除排队消息"
+      "delete": "删除排队消息",
+      "steer": "Steer",
+      "editing": "编辑中",
+      "collapse": "收起队列",
+      "expand": "展开队列"
     }
   },
   "providerSelection": {
