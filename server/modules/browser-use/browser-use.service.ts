@@ -70,6 +70,7 @@ type RuntimeHandle = {
   steelSessionId?: string | null;
   steelBaseUrl?: string | null;
   steelApiKey?: string | null;
+  steelExclusive?: boolean;
 };
 
 type BrowserUseSettings = {
@@ -491,6 +492,33 @@ function ownerSessions(ownerId: string): BrowserUseSession[] {
   return [...sessions.values()].filter((session) => session.ownerId === ownerId);
 }
 
+/**
+ * Self-hosted Steel drives one Chrome, so a new Steel session takes it over.
+ * The sessions it replaces keep their last screenshot and stop, instead of
+ * staying "ready" while their handle silently points at the new page.
+ */
+async function replaceExclusiveSteelSessions(steelBaseUrl: string): Promise<void> {
+  await Promise.all([...handles.entries()].map(async ([sessionId, handle]) => {
+    if (handle.provider !== 'steel' || !handle.steelExclusive || handle.steelBaseUrl !== steelBaseUrl) {
+      return;
+    }
+
+    const session = sessions.get(sessionId);
+    if (session && handle.page) {
+      await captureSession(session, handle.page).catch(() => undefined);
+    }
+    await closeHandle(sessionId);
+    if (session) {
+      session.status = 'stopped';
+      session.debugUrl = null;
+      session.cursor = null;
+      session.updatedAt = new Date().toISOString();
+      session.lastAction = 'replaced';
+      session.message = 'A newer session took over the Steel browser. This is the last page this session showed.';
+    }
+  }));
+}
+
 async function closeHandle(sessionId: string): Promise<void> {
   const handle = handles.get(sessionId);
   handles.delete(sessionId);
@@ -715,12 +743,21 @@ export const browserUseService = {
     };
   },
 
-  async listSessions() {
+  /**
+   * `compact` drops screenshots for polling clients. A ready session without a
+   * live view keeps its screenshot, because that is the only picture of it.
+   */
+  async listSessions(options: { compact?: boolean } = {}) {
     await expireStaleSessions();
     await refreshOpenPageLabels();
     return [...sessions.values()]
       .filter((session) => session.ownerId === AGENT_OWNER_ID)
-      .map(publicSession);
+      .map(publicSession)
+      .map((session) => (
+        options.compact && !(session.status === 'ready' && !session.debugUrl)
+          ? { ...session, screenshotDataUrl: null }
+          : session
+      ));
   },
 
   async createAgentSession(options?: { profileName?: string | null }) {
@@ -784,6 +821,12 @@ export const browserUseService = {
       fs.mkdirSync(PROFILE_ROOT, { recursive: true });
     }
 
+    if (steelReady) {
+      // Release the old Steel session before creating the next one, so the
+      // release cannot land on the browser the new session just received.
+      await replaceExclusiveSteelSessions(settings.steelBaseUrl);
+    }
+
     try {
       const launched = await launchAgentBrowser({
         playwright: readiness.playwright,
@@ -808,6 +851,7 @@ export const browserUseService = {
         steelSessionId: launched.steelSessionId,
         steelBaseUrl: launched.steelBaseUrl,
         steelApiKey: launched.provider === 'steel' ? settings.steelApiKey : null,
+        steelExclusive: launched.steelExclusive,
       });
       await captureSession(session, launched.page);
     } catch (error) {

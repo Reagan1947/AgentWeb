@@ -1,7 +1,6 @@
-import crypto from 'node:crypto';
-import os from 'node:os';
-import path from 'node:path';
+import { statSync } from 'node:fs';
 
+import { resolveCursorStoreDbPath } from '@/modules/providers/list/cursor/cursor-session-store.js';
 import { parseFilesInputTag, parseImagesInputTag } from '@/shared/image-attachments.js';
 import type { IProviderSessions } from '@/shared/interfaces.js';
 import type { AnyRecord, FetchHistoryOptions, FetchHistoryResult, NormalizedMessage } from '@/shared/types.js';
@@ -9,7 +8,6 @@ import {
   createNormalizedMessage,
   generateMessageId,
   readObjectRecord,
-  sanitizeLeafDirectoryName,
   sliceTailPage,
 } from '@/shared/utils.js';
 
@@ -224,27 +222,38 @@ function normalizeCursorToolInput(toolName: string, rawInput: unknown): unknown 
   return normalized;
 }
 
+/**
+ * When the chat was last written. SQLite appends to `store.db-wal` first and
+ * only folds it into `store.db` at a checkpoint, so the newer of the two wins.
+ */
+function readStoreLastWrittenAt(storeDbPath: string): number {
+  let lastWrittenAt = 0;
+  for (const filePath of [storeDbPath, `${storeDbPath}-wal`]) {
+    try {
+      lastWrittenAt = Math.max(lastWrittenAt, statSync(filePath).mtimeMs);
+    } catch {
+      // The WAL only exists while a writer has it open.
+    }
+  }
+  return lastWrittenAt || Date.now();
+}
+
 export class CursorSessionsProvider implements IProviderSessions {
   /**
    * Loads Cursor's SQLite blob DAG and returns message blobs in conversation
    * order. Cursor history is stored as content-addressed blobs rather than JSONL.
    */
-  private async loadCursorBlobs(sessionId: string, projectPath: string): Promise<CursorMessageBlob[]> {
+  private async loadCursorBlobs(
+    sessionId: string,
+    projectPath: string,
+  ): Promise<{ blobs: CursorMessageBlob[]; lastWrittenAt: number }> {
     // Lazy-import better-sqlite3 so the module doesn't fail if it's unavailable
     const { default: Database } = await import('better-sqlite3');
 
-    const cwdId = crypto.createHash('md5').update(projectPath || process.cwd()).digest('hex');
-    const safeSessionId = sanitizeLeafDirectoryName(sessionId, 'cursor session id');
-    const baseChatsPath = path.join(os.homedir(), '.cursor', 'chats', cwdId);
-    const storeDbPath = path.join(baseChatsPath, safeSessionId, 'store.db');
-    const resolvedBaseChatsPath = path.resolve(baseChatsPath);
-    const resolvedStoreDbPath = path.resolve(storeDbPath);
-    const relativeStorePath = path.relative(resolvedBaseChatsPath, resolvedStoreDbPath);
-    if (relativeStorePath.startsWith('..') || path.isAbsolute(relativeStorePath)) {
-      throw new Error(`Invalid cursor session path for "${sessionId}".`);
-    }
+    const storeDbPath = resolveCursorStoreDbPath(sessionId, projectPath);
 
-    const db = new Database(resolvedStoreDbPath, { readonly: true, fileMustExist: true });
+    const db = new Database(storeDbPath, { readonly: true, fileMustExist: true });
+    const lastWrittenAt = readStoreLastWrittenAt(storeDbPath);
 
     try {
       const allBlobs = db.prepare<[], CursorDbBlob>('SELECT rowid, id, data FROM blobs').all();
@@ -361,7 +370,7 @@ export class CursorSessionsProvider implements IProviderSessions {
         });
       }
 
-      return messages;
+      return { blobs: messages, lastWrittenAt };
     } finally {
       db.close();
     }
@@ -410,8 +419,8 @@ export class CursorSessionsProvider implements IProviderSessions {
     const providerSessionId = options.providerSessionId ?? sessionId;
 
     try {
-      const blobs = await this.loadCursorBlobs(providerSessionId, projectPath);
-      const allNormalized = this.normalizeCursorBlobs(blobs, sessionId);
+      const { blobs, lastWrittenAt } = await this.loadCursorBlobs(providerSessionId, projectPath);
+      const allNormalized = this.normalizeCursorBlobs(blobs, sessionId, lastWrittenAt);
       const renderableMessages = allNormalized.filter((msg) => msg.kind !== 'tool_result');
       const total = renderableMessages.length;
       const { page, hasMore } = sliceTailPage(renderableMessages, limit, offset);
@@ -436,16 +445,26 @@ export class CursorSessionsProvider implements IProviderSessions {
    *
    * Public so tests can drive history normalization with synthetic blobs
    * without needing a real Cursor store.db.
+   *
+   * Cursor keeps no per-message time, so rows are stamped back from when the
+   * store was last written, one millisecond per row. The chat interleaves
+   * these rows with live ones by timestamp: stamps taken from the fetch time
+   * moved on every refresh, and a long chat reached into the future, so a
+   * reply still on screen sorted above the history it followed.
    */
-  normalizeCursorBlobs(blobs: CursorMessageBlob[], sessionId: string | null): NormalizedMessage[] {
+  normalizeCursorBlobs(
+    blobs: CursorMessageBlob[],
+    sessionId: string | null,
+    lastWrittenAt: number = Date.now(),
+  ): NormalizedMessage[] {
     const messages: NormalizedMessage[] = [];
     const toolUseMap = new Map<string, NormalizedMessage>();
-    const baseTime = Date.now();
+    const lastSequence = blobs.reduce((latest, blob, index) => Math.max(latest, blob.sequence ?? index), 0);
 
     for (let i = 0; i < blobs.length; i++) {
       const blob = blobs[i];
       const content = blob.content;
-      const ts = new Date(baseTime + (blob.sequence ?? i) * 100).toISOString();
+      const ts = new Date(lastWrittenAt - (lastSequence - (blob.sequence ?? i))).toISOString();
       const baseId = blob.id || generateMessageId('cursor');
 
       try {

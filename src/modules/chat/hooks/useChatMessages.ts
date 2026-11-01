@@ -7,9 +7,29 @@ import type { ChatMessage, LiveTaskStatus, NormalizedMessage, SubagentActivity }
 import { formatUsageLimitText } from '@/modules/chat/utils/chatFormatting';
 
 function formatToolResultContent(content: unknown): string {
-  const text = typeof content === 'string' ? content : JSON.stringify(content);
+  const serialized = typeof content === 'string' ? content : JSON.stringify(content);
+  // JSON.stringify(undefined) is undefined, and a missing tool-result body
+  // must not throw while the transcript is rendering.
+  const text = typeof serialized === 'string' ? serialized : '';
   const toolUseErrorMatch = /^<tool_use_error>([\s\S]*)<\/tool_use_error>$/.exec(text.trim());
   return toolUseErrorMatch ? toolUseErrorMatch[1] : text;
+}
+
+function attachedToolResultContent(source: NonNullable<ToolResultSource>): unknown {
+  if (typeof source.content === 'string') {
+    return source.content;
+  }
+  if ('toolResult' in source && typeof source.toolResult?.content === 'string') {
+    return source.toolResult.content;
+  }
+  return source.content;
+}
+
+function attachedToolResultIsError(source: NonNullable<ToolResultSource>): boolean {
+  if (source.isError) {
+    return true;
+  }
+  return Boolean('toolResult' in source && source.toolResult?.isError);
 }
 
 type ParsedTaskNotification = {
@@ -459,8 +479,8 @@ export function normalizedToChatMessages(messages: NormalizedMessage[]): ChatMes
 
         const toolResult = tr
           ? {
-              content: formatToolResultContent(tr.content),
-              isError: Boolean(tr.isError),
+              content: formatToolResultContent(attachedToolResultContent(tr)),
+              isError: attachedToolResultIsError(tr),
               toolUseResult: tr.toolUseResult,
             }
           : null;

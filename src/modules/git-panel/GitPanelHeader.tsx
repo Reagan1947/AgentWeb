@@ -3,10 +3,16 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { ConfirmationRequest, GitRemoteStatus } from '@/shared/types';
+import { Button } from '@/shared/ui';
+import { cn } from '@/shared/utils';
+import {
+  WORKSPACE_PANE_ACTION_CLASS,
+  WORKSPACE_PANE_ICON_ACTION_CLASS,
+  WORKSPACE_PANE_TOOLBAR_CHROME_CLASS,
+} from '@/shared/constants';
 import NewBranchModal from '@/modules/git-panel/modals/NewBranchModal';
 
 type GitPanelHeaderProps = {
-  isMobile: boolean;
   currentBranch: string;
   branches: string[];
   remoteStatus: GitRemoteStatus | null;
@@ -32,7 +38,6 @@ type GitPanelHeaderProps = {
 
 /** Rendered by GitPanel to host the branch switcher and the fetch/pull/push/publish/revert actions. */
 export default function GitPanelHeader({
-  isMobile,
   currentBranch,
   branches,
   remoteStatus,
@@ -138,17 +143,110 @@ export default function GitPanelHeader({
 
   return (
     <>
-      {/* Branch row + action buttons */}
-      <div className={`flex items-center justify-between border-b border-border/60 ${isMobile ? 'px-3 py-2' : 'px-4 py-3'}`}>
-        {/* Branch selector */}
-        <div className="relative" ref={dropdownRef}>
-          <button
-            onClick={() => setShowBranchDropdown((prev) => !prev)}
-            className={`flex items-center rounded-lg transition-colors hover:bg-accent ${isMobile ? 'space-x-1 px-2 py-1' : 'space-x-2 px-3 py-1.5'}`}
+      <div className={cn('flex items-center justify-between gap-2', WORKSPACE_PANE_TOOLBAR_CHROME_CLASS)}>
+        <div className="flex min-w-0 flex-wrap items-center gap-1">
+          {remoteStatus?.hasRemote && (
+            <>
+              {!remoteStatus.hasUpstream ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={requestPublishConfirmation}
+                  disabled={anyPending}
+                  className={WORKSPACE_PANE_ACTION_CLASS}
+                  title={t('git:header.publishTitle', { branch: currentBranch, remote: remoteName })}
+                >
+                  <Upload className={isPublishing ? 'animate-pulse' : ''} />
+                  <span>{isPublishing ? t('git:header.publishing') : t('git:header.publish')}</span>
+                </Button>
+              ) : (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void onFetch()}
+                    disabled={anyPending}
+                    className={WORKSPACE_PANE_ACTION_CLASS}
+                    title={t('git:header.fetchTitle', { remote: remoteName })}
+                  >
+                    <RefreshCw className={isFetching ? 'animate-spin' : ''} />
+                    <span>{isFetching ? t('git:header.fetching') : t('git:header.fetch')}</span>
+                  </Button>
+
+                  {behindCount > 0 && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={requestPullConfirmation}
+                      disabled={anyPending}
+                      className={WORKSPACE_PANE_ACTION_CLASS}
+                      title={t('git:header.pullTitle', { n: behindCount, remote: remoteName })}
+                    >
+                      <Download className={isPulling ? 'animate-pulse' : ''} />
+                      <span>{isPulling ? t('git:header.pulling') : t('git:header.pullCount', { n: behindCount })}</span>
+                    </Button>
+                  )}
+
+                  {aheadCount > 0 && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={requestPushConfirmation}
+                      disabled={anyPending}
+                      className={WORKSPACE_PANE_ACTION_CLASS}
+                      title={t('git:header.pushTitle', { n: aheadCount, remote: remoteName })}
+                    >
+                      <Upload className={isPushing ? 'animate-pulse' : ''} />
+                      <span>{isPushing ? t('git:header.pushing') : t('git:header.pushCount', { n: aheadCount })}</span>
+                    </Button>
+                  )}
+                </>
+              )}
+            </>
+          )}
+
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={requestRevertLocalCommitConfirmation}
+            disabled={isRevertingLocalCommit}
+            className={WORKSPACE_PANE_ICON_ACTION_CLASS}
+            title={t('git:header.revertTitle')}
+            aria-label={t('git:header.revertTitle')}
           >
-            <GitBranch className={`text-muted-foreground ${isMobile ? 'h-3 w-3' : 'h-4 w-4'}`} />
-            <span className="flex items-center gap-1">
-              <span className={`font-medium ${isMobile ? 'text-xs' : 'text-sm'}`}>{currentBranch}</span>
+            <RotateCcw className={isRevertingLocalCommit ? 'animate-pulse' : ''} />
+          </Button>
+
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onRefresh}
+            disabled={isLoading}
+            className={WORKSPACE_PANE_ICON_ACTION_CLASS}
+            title={t('git:header.refreshTitle')}
+            aria-label={t('git:header.refreshTitle')}
+          >
+            <RefreshCw className={isLoading ? 'animate-spin' : ''} />
+          </Button>
+        </div>
+
+        <div className="relative shrink-0" ref={dropdownRef}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setShowBranchDropdown((prev) => !prev)}
+            className={cn(WORKSPACE_PANE_ACTION_CLASS, 'max-w-[16rem]')}
+          >
+            <GitBranch />
+            <span className="flex min-w-0 items-center gap-1">
+              <span className="truncate font-medium">{currentBranch}</span>
               {remoteStatus?.hasRemote && (
                 <span className="flex items-center gap-0.5 text-xs">
                   {aheadCount > 0 && (
@@ -167,11 +265,11 @@ export default function GitPanelHeader({
                 </span>
               )}
             </span>
-            <ChevronDown className={`h-3 w-3 text-muted-foreground transition-transform ${showBranchDropdown ? 'rotate-180' : ''}`} />
-          </button>
+            <ChevronDown className={cn('transition-transform', showBranchDropdown && 'rotate-180')} />
+          </Button>
 
           {showBranchDropdown && (
-            <div className="absolute left-0 top-full z-50 mt-1 w-64 overflow-hidden rounded-xl border border-border bg-card shadow-lg">
+            <div className="absolute right-0 top-full z-50 mt-1 w-64 overflow-hidden rounded-xl border border-border bg-card shadow-lg">
               <div className="flex items-center gap-2 border-b border-border px-3 py-2">
                 <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                 <input
@@ -226,82 +324,6 @@ export default function GitPanelHeader({
               </div>
             </div>
           )}
-        </div>
-
-        {/* Action buttons */}
-        <div className={`flex items-center ${isMobile ? 'gap-1' : 'gap-2'}`}>
-          {remoteStatus?.hasRemote && (
-            <>
-              {!remoteStatus.hasUpstream ? (
-                <button
-                  onClick={requestPublishConfirmation}
-                  disabled={anyPending}
-                  className="flex items-center gap-1 rounded-lg bg-primary px-2.5 py-1 text-sm text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
-                  title={t('git:header.publishTitle', { branch: currentBranch, remote: remoteName })}
-                >
-                  <Upload className={`h-3 w-3 ${isPublishing ? 'animate-pulse' : ''}`} />
-                  {!isMobile && <span>{isPublishing ? t('git:header.publishing') : t('git:header.publish')}</span>}
-                </button>
-              ) : (
-                <>
-                  {/* Fetch — always visible when remote exists */}
-                  <button
-                    onClick={() => void onFetch()}
-                    disabled={anyPending}
-                    className="flex items-center gap-1 rounded-lg bg-primary px-2.5 py-1 text-sm text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
-                    title={t('git:header.fetchTitle', { remote: remoteName })}
-                  >
-                    <RefreshCw className={`h-3 w-3 ${isFetching ? 'animate-spin' : ''}`} />
-                    {!isMobile && <span>{isFetching ? t('git:header.fetching') : t('git:header.fetch')}</span>}
-                  </button>
-
-                  {behindCount > 0 && (
-                    <button
-                      onClick={requestPullConfirmation}
-                      disabled={anyPending}
-                      className="flex items-center gap-1 rounded-lg bg-green-600 px-2.5 py-1 text-sm text-white transition-colors hover:bg-green-700 disabled:opacity-50"
-                      title={t('git:header.pullTitle', { n: behindCount, remote: remoteName })}
-                    >
-                      <Download className={`h-3 w-3 ${isPulling ? 'animate-pulse' : ''}`} />
-                      {!isMobile && <span>{isPulling ? t('git:header.pulling') : t('git:header.pullCount', { n: behindCount })}</span>}
-                    </button>
-                  )}
-
-                  {aheadCount > 0 && (
-                    <button
-                      onClick={requestPushConfirmation}
-                      disabled={anyPending}
-                      className="flex items-center gap-1 rounded-lg bg-orange-600 px-2.5 py-1 text-sm text-white transition-colors hover:bg-orange-700 disabled:opacity-50"
-                      title={t('git:header.pushTitle', { n: aheadCount, remote: remoteName })}
-                    >
-                      <Upload className={`h-3 w-3 ${isPushing ? 'animate-pulse' : ''}`} />
-                      {!isMobile && <span>{isPushing ? t('git:header.pushing') : t('git:header.pushCount', { n: aheadCount })}</span>}
-                    </button>
-                  )}
-                </>
-              )}
-            </>
-          )}
-
-          <button
-            onClick={requestRevertLocalCommitConfirmation}
-            disabled={isRevertingLocalCommit}
-            className={`rounded-lg transition-colors hover:bg-accent disabled:opacity-50 ${isMobile ? 'p-1' : 'p-1.5'}`}
-            title={t('git:header.revertTitle')}
-          >
-            <RotateCcw
-              className={`text-muted-foreground ${isRevertingLocalCommit ? 'animate-pulse' : ''} ${isMobile ? 'h-3 w-3' : 'h-4 w-4'}`}
-            />
-          </button>
-
-          <button
-            onClick={onRefresh}
-            disabled={isLoading}
-            className={`rounded-lg transition-colors hover:bg-accent ${isMobile ? 'p-1' : 'p-1.5'}`}
-            title={t('git:header.refreshTitle')}
-          >
-            <RefreshCw className={`text-muted-foreground ${isLoading ? 'animate-spin' : ''} ${isMobile ? 'h-3 w-3' : 'h-4 w-4'}`} />
-          </button>
         </div>
       </div>
 

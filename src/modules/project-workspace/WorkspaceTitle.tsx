@@ -16,33 +16,27 @@ type WorkspaceTitleProps = {
 };
 
 function getTabTitle(activeTab: AppTab, shouldShowTasksTab: boolean, t: (key: string) => string, pluginDisplayName?: string) {
-  if (activeTab.startsWith('plugin:') && pluginDisplayName) {
-    return pluginDisplayName;
+  if (activeTab.startsWith('plugin:')) {
+    return pluginDisplayName || t('misc.projectFallback');
   }
 
-  if (activeTab === 'files') {
-    return t('mainContent.projectFiles');
+  // Chat keeps the session title in the caller. Every other pane uses the same
+  // name as its tab, so the header beside the switcher says Shell, Browser, and so on.
+  if (activeTab === 'chat') {
+    return t('tabs.chat');
   }
 
-  if (activeTab === 'git') {
-    return t('tabs.git');
+  if (activeTab === 'tasks' && !shouldShowTasksTab) {
+    return t('misc.projectFallback');
   }
 
-  if (activeTab === 'tasks' && shouldShowTasksTab) {
-    return 'TaskMaster';
-  }
-
-  if (activeTab === 'browser') {
-    return t('tabs.browser');
-  }
-
-  return t('misc.projectFallback');
+  return t(`tabs.${activeTab}`);
 }
 
 /**
- * Rendered by WorkspaceHeader to label the workspace with the active session or
- * tab name. On the chat tab the session title can be double-clicked to rename
- * the session in place, as a second way in beside the sidebar's rename.
+ * Rendered by WorkspaceHeader beside the tab switcher. Chat shows the session
+ * title, which can be double-clicked to rename the session in place, beside
+ * the sidebar's rename. Every other tab shows that tab's own function name.
  */
 export default function WorkspaceTitle({
   activeTab,

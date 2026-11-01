@@ -5,7 +5,7 @@ import { FileTree } from '@/modules/file-tree';
 import { StandaloneShell } from '@/modules/standalone-shell';
 import { GitPanel } from '@/modules/git-panel';
 import { PluginTabContent } from '@/modules/plugins';
-import { BrowserUsePanel, useBrowserUseEnabled } from '@/modules/browser-use';
+import { BrowserUseFloatingWindow, BrowserUsePanel, useBrowserUseEnabled } from '@/modules/browser-use';
 import { usePaletteOpsRegister } from '@/modules/command-palette';
 import { TaskMasterPanel, useTaskMasterProjectSync, useTasksSettings } from '@/modules/task-master';
 import type { AppTab, DirectoryRevealRequest, Project, ProjectSession, SessionEstablishedContext, SessionNavigationOptions, SettingsMainTab } from '@/shared/types';
@@ -69,6 +69,13 @@ function WorkspaceMain({
   // The folder an in-chat `path/` reference asked to reveal. Held as an object
   // so that re-clicking the same folder is a new request the tree acts on.
   const [revealDirectory, setRevealDirectory] = useState<DirectoryRevealRequest | null>(null);
+  // Counts pop-out clicks in the Browser tab; each new value reopens the floating browser window.
+  const [browserPopOutRequest, setBrowserPopOutRequest] = useState(0);
+
+  const handleBrowserPopOut = useCallback(() => {
+    setBrowserPopOutRequest((value) => value + 1);
+    setActiveTab('chat');
+  }, [setActiveTab]);
 
   const shouldShowTasksTab = Boolean(tasksEnabled && isTaskMasterInstalled);
   const shouldShowBrowserTab = browserUseEnabled;
@@ -216,7 +223,11 @@ function WorkspaceMain({
 
           {shouldShowBrowserTab && activeTab === 'browser' && (
             <div className="h-full overflow-hidden">
-              <BrowserUsePanel isVisible={activeTab === 'browser'} onShowSettings={onShowSettings} />
+              <BrowserUsePanel
+                isVisible={activeTab === 'browser'}
+                onShowSettings={onShowSettings}
+                onPopOut={isMobile ? undefined : handleBrowserPopOut}
+              />
             </div>
           )}
 
@@ -246,6 +257,13 @@ function WorkspaceMain({
           fillSpace={activeTab === 'files'}
         />
       </div>
+
+      <BrowserUseFloatingWindow
+        enabled={shouldShowBrowserTab && activeTab !== 'browser' && !isMobile}
+        openRequest={browserPopOutRequest}
+        isChatVisible={activeTab === 'chat'}
+        onOpenBrowserTab={() => setActiveTab('browser')}
+      />
     </div>
   );
 }

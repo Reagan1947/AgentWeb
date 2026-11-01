@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  Bot,
   Clock3,
   Download,
   Expand,
   ExternalLink,
   Loader2,
   MonitorPlay,
+  PictureInPicture2,
   RefreshCw,
   Settings,
   Square,
@@ -16,9 +16,10 @@ import {
 } from 'lucide-react';
 
 import { cn } from '@/shared/utils';
-import { Badge, Button } from '@/shared/ui';
+import { Badge, BrowserIcon, Button } from '@/shared/ui';
+import { WORKSPACE_PANE_ACTION_CLASS, WORKSPACE_PANE_TOOLBAR_CHROME_CLASS } from '@/shared/constants';
 import { api, readApiJson, ApiRequestError } from '@/shared/api';
-import type { SettingsMainTab } from '@/shared/types';
+import type { BrowserUseSession, SettingsMainTab } from '@/shared/types';
 
 type BrowserUseStatus = {
   enabled: boolean;
@@ -31,34 +32,11 @@ type BrowserUseStatus = {
   message: string;
 };
 
-type BrowserUseSession = {
-  id: string;
-  status: 'ready' | 'stopped' | 'unavailable';
-  url: string | null;
-  title: string | null;
-  screenshotDataUrl: string | null;
-  createdAt: string;
-  updatedAt: string;
-  lastAction: string | null;
-  message: string | null;
-  createdBy: 'agent';
-  profileName: string | null;
-  provider: 'steel' | 'playwright' | null;
-  debugUrl: string | null;
-  viewport: {
-    width: number;
-    height: number;
-  } | null;
-  cursor: {
-    x: number;
-    y: number;
-    actor: 'agent';
-  } | null;
-};
-
 type BrowserUsePanelProps = {
   isVisible: boolean;
   onShowSettings?: (tab?: SettingsMainTab) => void;
+  /** Leaves the Browser tab and opens the floating window, even if the user closed it. */
+  onPopOut?: () => void;
 };
 
 type TranslateFn = (key: string, options?: Record<string, unknown>) => string;
@@ -107,6 +85,8 @@ function getDomain(url: string | null, t: TranslateFn): string {
 
 function formatAction(action: string | null, t: TranslateFn): string {
   if (!action) return t('browserUse.waitingAction');
+  // The target URL is already on screen next to every action label.
+  if (action.startsWith('navigate:')) return 'navigate';
   return action.replace(/_/g, ' ').replace(/:/g, ': ');
 }
 
@@ -120,15 +100,9 @@ function getStatusTone(status: BrowserUseSession['status']): string {
   return 'border-border bg-background text-muted-foreground';
 }
 
-function getRuntimeTone(status: BrowserUseStatus | null, installing: boolean): string {
-  if (!status?.enabled) return 'border-border bg-muted text-muted-foreground';
-  if (status.available) return 'border-primary/30 bg-primary/5 text-foreground';
-  if (status.installInProgress || installing) return 'border-primary/30 bg-primary/5 text-foreground';
-  return 'border-border bg-background text-muted-foreground';
-}
-
-function getStatusLabel(status: BrowserUseSession['status'] | undefined, t: TranslateFn): string {
+function getStatusLabel(status: BrowserUseSession['status'] | undefined, t: TranslateFn, lastAction?: string | null): string {
   if (!status) return t('browserUse.statusEmpty');
+  if (status === 'stopped' && lastAction === 'replaced') return t('browserUse.statusReplacedSession');
   if (status === 'ready') return t('browserUse.statusReadySession');
   if (status === 'stopped') return t('browserUse.statusStoppedSession');
   if (status === 'unavailable') return t('browserUse.statusUnavailableSession');
@@ -145,7 +119,7 @@ const PROMPT_KEYS = ['browserUse.prompt1', 'browserUse.prompt2'];
 const SESSION_POLL_INTERVAL_MS = 2000;
 
 /** Used by the project-workspace module to render the Browser tab's session list and live preview. */
-export default function BrowserUsePanel({ isVisible, onShowSettings }: BrowserUsePanelProps) {
+export default function BrowserUsePanel({ isVisible, onShowSettings, onPopOut }: BrowserUsePanelProps) {
   const { t } = useTranslation('settings');
   const [status, setStatus] = useState<BrowserUseStatus | null>(null);
   const [sessions, setSessions] = useState<BrowserUseSession[]>([]);
@@ -159,11 +133,19 @@ export default function BrowserUsePanel({ isVisible, onShowSettings }: BrowserUs
   const refreshGeneration = useRef(0);
   // Keeps the background poll from replacing a manual refresh that is still in flight.
   const manualRefresh = useRef(false);
+  // Session ids from the previous poll, so a newly created session can take the selection once.
+  const knownSessionIds = useRef<Set<string> | null>(null);
 
   const selectedSession = useMemo(
     () => sessions.find((session) => session.id === selectedSessionId) || sessions[0] || null,
     [selectedSessionId, sessions],
   );
+  // Self-hosted Steel runs one Chrome, so at most one session owns the live view.
+  const liveSession = useMemo(
+    () => [...sessions].reverse().find((session) => session.status === 'ready' && session.debugUrl) || null,
+    [sessions],
+  );
+  const isReplacedSession = selectedSession?.lastAction === 'replaced';
 
   const activeSessions = sessions.filter((session) => session.status === 'ready');
   const needsBrowserBinaries = Boolean(
@@ -171,13 +153,6 @@ export default function BrowserUsePanel({ isVisible, onShowSettings }: BrowserUs
     && !status.available
     && (!status.playwrightInstalled || (!status.chromiumInstalled && !status.steelReachable)),
   );
-  const runtimeLabel = !status?.enabled
-    ? t('browserUse.runtimeDisabled')
-    : status.available
-      ? t('browserUse.runtimeReady')
-      : status.installInProgress || isInstalling
-        ? t('browserUse.runtimeInstalling')
-        : t('browserUse.runtimeSetupRequired');
 
   const cursorStyle = selectedSession?.cursor && selectedSession.viewport
     ? {
@@ -210,11 +185,18 @@ export default function BrowserUsePanel({ isVisible, onShowSettings }: BrowserUs
       const nextSessions = sessionsData.data.sessions;
       setStatus(statusData.data);
       setSessions(nextSessions);
-      setSelectedSessionId((current) => (
-        current && nextSessions.some((session) => session.id === current)
-          ? current
-          : nextSessions[0]?.id || null
-      ));
+      const previousIds = knownSessionIds.current;
+      knownSessionIds.current = new Set(nextSessions.map((session) => session.id));
+      const newestReady = [...nextSessions].reverse().find((session) => session.status === 'ready');
+      const newlyCreated = previousIds
+        ? [...nextSessions].reverse().find((session) => !previousIds.has(session.id))
+        : null;
+      setSelectedSessionId((current) => {
+        // Follow an agent that just opened a session; otherwise keep the user's pick.
+        if (newlyCreated) return newlyCreated.id;
+        if (current && nextSessions.some((session) => session.id === current)) return current;
+        return newestReady?.id || nextSessions[nextSessions.length - 1]?.id || null;
+      });
       setError(null);
     } catch (err) {
       if (refreshGeneration.current !== generation || options?.silent) {
@@ -303,7 +285,7 @@ export default function BrowserUsePanel({ isVisible, onShowSettings }: BrowserUs
             <div className="mt-1 truncate pl-3.5 text-xs text-muted-foreground">{getDomain(session.url, t)}</div>
           </div>
           <Badge variant="outline" className="shrink-0 border-border bg-background text-[10px] text-muted-foreground">
-            {getStatusLabel(session.status, t)}
+            {getStatusLabel(session.status, t, session.lastAction)}
           </Badge>
         </div>
         <div className="mt-2 flex items-center gap-1.5 text-[11px] text-muted-foreground">
@@ -320,7 +302,7 @@ export default function BrowserUsePanel({ isVisible, onShowSettings }: BrowserUs
       <div className="w-full max-w-2xl rounded-md border border-border bg-card/40 p-5 shadow-sm">
         <div className="flex items-start gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-border bg-background">
-            <MonitorPlay className="h-5 w-5 text-primary" />
+            <BrowserIcon className="h-5 w-5 text-primary" />
           </div>
           <div className="min-w-0">
             <div className="text-sm font-semibold text-foreground">
@@ -358,8 +340,7 @@ export default function BrowserUsePanel({ isVisible, onShowSettings }: BrowserUs
         <div className="mt-5 grid gap-2 sm:grid-cols-2">
           {PROMPT_KEYS.map((promptKey) => (
             <div key={promptKey} className="rounded-md border border-border/70 bg-background/70 p-3">
-              <div className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                <Bot className="h-3.5 w-3.5" />
+              <div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 {t('browserUse.promptLabel')}
               </div>
               <p className="text-sm leading-6 text-foreground">{t(promptKey)}</p>
@@ -389,6 +370,23 @@ export default function BrowserUsePanel({ isVisible, onShowSettings }: BrowserUs
         />
       ) : selectedSession?.screenshotDataUrl ? (
         <div className="relative inline-block max-h-full">
+          {isReplacedSession && (
+            <div className="absolute inset-x-0 top-0 z-10 flex flex-wrap items-center justify-between gap-2 bg-black/75 px-3 py-2 text-xs text-white">
+              <span>{t('browserUse.replacedNotice')}</span>
+              {liveSession && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  className="h-7"
+                  onClick={() => setSelectedSessionId(liveSession.id)}
+                >
+                  <MonitorPlay className="h-3.5 w-3.5" />
+                  {t('browserUse.showLiveSession')}
+                </Button>
+              )}
+            </div>
+          )}
           <img
             src={selectedSession.screenshotDataUrl}
             alt={t('browserUse.screenshotAlt')}
@@ -415,42 +413,32 @@ export default function BrowserUsePanel({ isVisible, onShowSettings }: BrowserUs
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-background">
-      <div className="flex items-center justify-between gap-3 border-b border-border/60 px-4 py-3">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <MonitorPlay className="h-4 w-4 text-primary" />
-            <h3 className="text-sm font-semibold text-foreground">{t('browserUse.title')}</h3>
-            <Badge variant="outline" className={cn('text-[10px]', getRuntimeTone(status, isInstalling))}>
-              {runtimeLabel}
-            </Badge>
-          </div>
-          <p className="mt-0.5 text-xs text-muted-foreground">{t('browserUse.subtitle')}</p>
-        </div>
-        <div className="flex items-center gap-1.5">
-          {onShowSettings && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 w-7 p-0"
-              onClick={() => onShowSettings('browser')}
-              title={t('browserUse.openSettings')}
-              aria-label={t('browserUse.openSettings')}
-            >
-              <Settings className="h-3.5 w-3.5" />
-            </Button>
-          )}
+      <div className={cn('flex min-w-0 flex-wrap items-center gap-1', WORKSPACE_PANE_TOOLBAR_CHROME_CLASS)}>
+        {onShowSettings && (
           <Button
-            variant="ghost"
+            variant="outline"
             size="sm"
-            className="h-7 w-7 p-0"
-            onClick={() => void refresh()}
-            disabled={isRefreshing || isBusy}
-            title={t('browserUse.refreshSessions')}
-            aria-label={t('browserUse.refreshSessions')}
+            className={WORKSPACE_PANE_ACTION_CLASS}
+            onClick={() => onShowSettings('browser')}
+            title={t('browserUse.openSettings')}
+            aria-label={t('browserUse.openSettings')}
           >
-            <RefreshCw className={cn('h-3.5 w-3.5', isRefreshing && 'animate-spin')} />
+            <Settings />
+            <span>{t('browserUse.openSettings')}</span>
           </Button>
-        </div>
+        )}
+        <Button
+          variant="outline"
+          size="sm"
+          className={WORKSPACE_PANE_ACTION_CLASS}
+          onClick={() => void refresh()}
+          disabled={isRefreshing || isBusy}
+          title={t('browserUse.refreshSessions')}
+          aria-label={t('browserUse.refreshSessions')}
+        >
+          <RefreshCw className={cn(isRefreshing && 'animate-spin')} />
+          <span>{t('browserUse.refreshSessions')}</span>
+        </Button>
       </div>
 
       {error && (
@@ -486,38 +474,44 @@ export default function BrowserUsePanel({ isVisible, onShowSettings }: BrowserUs
 
       <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px]">
         <main className="flex min-h-0 flex-col overflow-hidden">
-          <div className="flex items-center justify-between gap-3 border-b border-border/60 bg-muted/20 px-4 py-2.5 text-xs text-muted-foreground">
-            <div className="min-w-0 truncate">
-              {t('browserUse.activeCount', { n: activeSessions.length })}
-              <span className="px-1.5">/</span>
-              {t('browserUse.totalCount', { n: sessions.length })}
-            </div>
-            <div className="min-w-0 truncate">
-              {t('browserUse.updated', { time: formatRelativeTime(selectedSession?.updatedAt || null, t) })}
-            </div>
-          </div>
-
           {sessions.length === 0 ? (
             renderEmptyState()
           ) : (
             <div className="min-h-0 flex-1 overflow-auto bg-muted/20 p-4">
               <div className="mx-auto flex h-full min-h-[500px] max-w-7xl flex-col overflow-hidden rounded-md border border-border bg-background shadow-sm">
                 <div className="flex flex-wrap items-center gap-2 border-b border-border/60 px-3 py-2">
-                  <Badge variant="outline" className={selectedSession ? cn('text-[10px]', getStatusTone(selectedSession.status)) : 'text-[10px]'}>
-                    {getStatusLabel(selectedSession?.status, t)}
-                  </Badge>
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-medium text-foreground">
-                      {selectedSession?.title || getDomain(selectedSession?.url || null, t)}
+                    <div className="flex min-w-0 items-center gap-2">
+                      {selectedSession && (
+                        <span
+                          className={cn('h-2 w-2 shrink-0 rounded-full', getStatusDot(selectedSession.status))}
+                          title={getStatusLabel(selectedSession.status, t, selectedSession.lastAction)}
+                        />
+                      )}
+                      <span className="truncate text-sm font-medium text-foreground">
+                        {selectedSession?.title || getDomain(selectedSession?.url || null, t)}
+                      </span>
+                      {/* "ready" is the normal case; only call out a session that can no longer be driven. */}
+                      {selectedSession && selectedSession.status !== 'ready' && (
+                        <Badge variant="outline" className={cn('shrink-0 text-[10px]', getStatusTone(selectedSession.status))}>
+                          {getStatusLabel(selectedSession.status, t, selectedSession.lastAction)}
+                        </Badge>
+                      )}
                     </div>
                     <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
                       <ExternalLink className="h-3.5 w-3.5 shrink-0" />
                       <span className="truncate">{selectedSession?.url || t('browserUse.noPageLoaded')}</span>
                     </div>
                   </div>
-                  <div className="hidden text-xs text-muted-foreground md:block">
+                  {/* The Selected card shows the last action from lg up. */}
+                  <div className="hidden text-xs text-muted-foreground md:block lg:hidden">
                     {formatAction(selectedSession?.lastAction || null, t)}
                   </div>
+                  {onPopOut && (
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 [&_svg]:size-[18px]" onClick={onPopOut} disabled={activeSessions.length === 0} title={t('browserUse.popOut')} aria-label={t('browserUse.popOut')}>
+                      <PictureInPicture2 />
+                    </Button>
+                  )}
                   <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setIsFullscreen(true)} disabled={!canExpand} title={t('browserUse.fullScreen')} aria-label={t('browserUse.fullScreen')}>
                     <Expand className="h-4 w-4" />
                   </Button>
@@ -557,14 +551,13 @@ export default function BrowserUsePanel({ isVisible, onShowSettings }: BrowserUs
 
           <div className="border-t border-border/60 p-3">
             <div className="rounded-md border border-border/70 bg-muted/30 p-3">
-              <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                <Bot className="h-3.5 w-3.5" />
+              <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 {t('browserUse.selected')}
               </div>
               <div className="mt-3 space-y-2 text-xs text-muted-foreground">
                 <div className="flex items-center justify-between gap-3">
                   <span>{t('browserUse.statusLabel')}</span>
-                  <span className="font-medium text-foreground">{getStatusLabel(selectedSession?.status, t)}</span>
+                  <span className="font-medium text-foreground">{getStatusLabel(selectedSession?.status, t, selectedSession?.lastAction)}</span>
                 </div>
                 <div className="flex items-center justify-between gap-3">
                   <span>{t('browserUse.lastAction')}</span>
@@ -605,7 +598,12 @@ export default function BrowserUsePanel({ isVisible, onShowSettings }: BrowserUs
           <div className="flex h-full flex-col rounded-md border border-white/10 bg-black">
             <div className="flex items-center justify-between border-b border-white/10 px-4 py-3 text-sm text-white/80">
               <div className="min-w-0 truncate">{selectedSession.title || selectedSession.url || t('browserUse.sessionFallback')}</div>
-              <Button variant="outline" size="sm" onClick={() => setIsFullscreen(false)}>
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white"
+                onClick={() => setIsFullscreen(false)}
+              >
                 <X className="h-4 w-4" />
                 {t('browserUse.close')}
               </Button>

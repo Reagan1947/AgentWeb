@@ -40,6 +40,7 @@ export {
 } from '@/shared/ui/attachment';
 export { Bubble, BubbleContent, BubbleGroup, BubbleReactions } from '@/shared/ui/bubble';
 export { Badge } from '@/shared/ui/Badge';
+export { BrowserIcon } from '@/shared/ui/BrowserIcon';
 export { Button, buttonVariants } from '@/shared/ui/Button';
 export {
   CodeBlock,

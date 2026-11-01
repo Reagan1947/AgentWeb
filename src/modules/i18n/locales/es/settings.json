@@ -803,7 +803,7 @@
     "fullScreen": "Pantalla completa",
     "stopSession": "Detener sesión",
     "deleteSession": "Eliminar sesión",
-    "sessions": "Sesiones",
+    "sessions": "Sesiones del navegador",
     "noSessions": "No hay sesiones de navegador del agente.",
     "selected": "Seleccionada",
     "statusLabel": "Estado",

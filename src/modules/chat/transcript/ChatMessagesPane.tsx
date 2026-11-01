@@ -18,6 +18,8 @@ import ProviderSelectionEmptyState from '@/modules/chat/transcript/ProviderSelec
 import ToolGroupContainer from '@/modules/chat/transcript/ToolGroupContainer';
 import LoadAllMessagesOverlay from '@/modules/chat/transcript/LoadAllMessagesOverlay';
 import ChatExportMenu from '@/modules/chat/transcript/ChatExportMenu';
+import { CHAT_HEADER_ACTIONS_PORTAL } from '@/shared/constants';
+import { useRegisterPortalTarget } from '@/shared/hooks/usePortalTarget';
 import { BackgroundTasksStrip } from '@/modules/chat/transcript/BackgroundTasksStrip';
 import {
   MessageScroller,
@@ -151,6 +153,7 @@ function ChatMessagesPane({
   selectedProject,
 }: ChatMessagesPaneProps) {
   const { t } = useTranslation('chat');
+  const registerHeaderActionsSlot = useRegisterPortalTarget(CHAT_HEADER_ACTIONS_PORTAL);
   const lazyRows = useLazyRowObserver(scrollContainerRef);
   const groupedVisibleMessages = useMemo(
     () => groupConsecutiveTools(visibleMessages, Boolean(showThinking)),
@@ -211,7 +214,9 @@ function ChatMessagesPane({
               onLoadAll={loadAllMessages}
             />
           </div>
-          <div className="pointer-events-auto">
+          <div className="pointer-events-auto flex items-center gap-2">
+            {/* Other modules (the minimized live browser) portal header actions in here. */}
+            <div ref={registerHeaderActionsSlot} className="flex items-center empty:hidden" />
             <ChatExportMenu
               messages={chatMessages}
               sessionTitle={selectedSession?.summary || selectedSession?.title}

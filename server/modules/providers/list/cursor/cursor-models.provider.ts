@@ -42,9 +42,18 @@ export const CURSOR_PREDEFINED_MODELS: ProviderModelsDefinition = {
 };
 
 const CURSOR_CHATS_ROOT = path.join(os.homedir(), '.cursor', 'chats');
+const CURSOR_ACP_SESSIONS_ROOT = path.join(os.homedir(), '.cursor', 'acp-sessions');
 
 const resolveCursorSessionStorePath = async (sessionId: string): Promise<string | null> => {
   const safeSessionId = sanitizeLeafDirectoryName(sessionId, 'cursor session id');
+
+  const acpStoreDbPath = path.join(CURSOR_ACP_SESSIONS_ROOT, safeSessionId, 'store.db');
+  try {
+    await access(acpStoreDbPath);
+    return acpStoreDbPath;
+  } catch {
+    // Chats started with `cursor-agent -p` live under `chats/<md5(cwd)>`.
+  }
 
   try {
     const workspaceEntries = await readdir(CURSOR_CHATS_ROOT, { withFileTypes: true });

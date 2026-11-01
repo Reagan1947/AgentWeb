@@ -652,7 +652,9 @@ export type ProviderRuntimeContext = {
    * and background-work paths can be driven without a CLI process.
    */
   createQuery?: (input: { prompt: AsyncIterable<unknown>; options: AnyRecord }) => AsyncIterable<unknown> & {
-    interrupt(): Promise<void>;
+    // The SDK may resolve this with a control response. Callers only need the
+    // promise to settle, so the result stays unknown.
+    interrupt(): Promise<unknown>;
     stopTask?(taskId: string): Promise<void>;
   };
 };

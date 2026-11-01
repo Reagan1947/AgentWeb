@@ -899,6 +899,36 @@ export type PermissionPanelProps = {
 
 // ---------------------------
 
+//----------------- BROWSER USE ------------
+
+/** One agent browser session as `GET /api/browser-use/sessions` returns it. Rendered by the Browser tab and its floating window; `debugUrl` is the Steel live view and is only set while the session is ready, `lastAction` is `replaced` once a newer session took over the shared Steel browser. */
+export type BrowserUseSession = {
+  id: string;
+  status: 'ready' | 'stopped' | 'unavailable';
+  url: string | null;
+  title: string | null;
+  screenshotDataUrl: string | null;
+  createdAt: string;
+  updatedAt: string;
+  lastAction: string | null;
+  message: string | null;
+  createdBy: 'agent';
+  profileName: string | null;
+  provider: 'steel' | 'playwright' | null;
+  debugUrl: string | null;
+  viewport: {
+    width: number;
+    height: number;
+  } | null;
+  cursor: {
+    x: number;
+    y: number;
+    actor: 'agent';
+  } | null;
+};
+
+// ---------------------------
+
 //----------------- CODE EDITOR ------------
 
 /** The before/after strings of a pending edit attached to a file opened in the code editor, used to drive the editor's inline merge/diff view; extra keys are tolerated because it comes straight from tool payloads. */

@@ -1,266 +1,146 @@
 <div align="center">
  <img src="public/agentweb-icon.png" alt="AgentWeb" width="128" height="128">
  <h1>AgentWeb</h1>
- <p>A desktop and mobile UI for <a href="https://docs.anthropic.com/en/docs/claude-code">Claude Code</a>, <a href="https://docs.cursor.com/en/cli/overview">Cursor CLI</a>, and <a href="https://developers.openai.com/codex">Codex</a>.<br>Built on <a href="https://github.com/siteboon/claudecodeui">CloudCLI UI</a>, with the interactive interface refined for day-to-day agent work. Use it locally or remotely to view your active projects and sessions from everywhere.</p>
+ <p>A web, desktop, and mobile UI for <a href="https://docs.anthropic.com/en/docs/claude-code">Claude Code</a>, <a href="https://docs.cursor.com/en/cli/overview">Cursor CLI</a>, and <a href="https://developers.openai.com/codex">Codex</a>.</p>
 </div>
 
-<p align="center">
- <a href="https://cloudcli.ai">CloudCLI Cloud</a> · <a href="https://cloudcli.ai/docs">Documentation</a> · <a href="https://discord.gg/buxwujPNRE">Discord</a> · <a href="https://github.com/siteboon/claudecodeui/issues">Bug Reports</a> · <a href="CONTRIBUTING.md">Contributing</a>
-</p>
-
-<p align="center">
- <a href="https://cloudcli.ai"><img src="https://img.shields.io/badge/☁️_CloudCLI_Cloud-Try_Now-0066FF?style=for-the-badge" alt="CloudCLI Cloud"></a>
- <a href="https://discord.gg/buxwujPNRE"><img src="https://img.shields.io/badge/Discord-Join%20Community-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Join our Discord"></a>
- <br><br>
- <a href="https://trendshift.io/repositories/15586" target="_blank"><img src="https://trendshift.io/api/badge/repositories/15586" alt="siteboon%2Fclaudecodeui | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
-</p>
-
-<div align="right"><i><b>English</b> · <a href="./docs/README.ru.md">Русский</a> · <a href="./docs/README.de.md">Deutsch</a> · <a href="./docs/README.ko.md">한국어</a> · <a href="./docs/README.zh-CN.md">简体中文</a> · <a href="./docs/README.zh-TW.md">繁體中文</a> · <a href="./docs/README.ja.md">日本語</a> · <a href="./docs/README.tr.md">Türkçe</a> · <a href="./docs/README.id.md">Bahasa Indonesia</a></i></div>
+<div align="right"><i><b>English</b> · <a href="./docs/README.zh-CN.md">简体中文</a></i></div>
 
 ---
 
 ## About
 
-AgentWeb is based on [CloudCLI UI](https://github.com/siteboon/claudecodeui) (also known as Claude Code UI). It keeps that project's workspace for Claude Code, Cursor CLI, and Codex, and continues from there with optimizations to the interactive interface — how conversations, navigation, and the surrounding workspace respond while you work with an agent.
+AgentWeb is a fork of [CloudCLI UI](https://github.com/siteboon/claudecodeui) (also known as Claude Code UI). It keeps the upstream workspace for Claude Code, Cursor CLI, and Codex, and adds a browser the agents can drive while you watch.
 
-The sections below describe the CloudCLI UI foundation this project builds on, including self-hosting, CloudCLI Cloud, and the original feature set.
+Ask an agent to open a page, click through a flow, or check a UI. The session shows up in the **Browser** tab: the page itself, plus status, the last action, and buttons to stop or delete it. With [Steel](https://github.com/steel-dev/steel-browser) that view is live. Without it, the tab shows screenshots from local Playwright. A floating window keeps the same page on screen while you stay in the chat.
 
----
-
-## Screenshots
+AgentWeb runs on your own machine and uses the CLIs and subscriptions you already have. It does not provide any AI model itself.
 
 <div align="center">
-
-<img src="public/screenshots/agentweb-main.png" alt="AgentWeb main interface" width="800">
-<br>
-<em>Project list and chat, with the refined AgentWeb interface</em>
-
+<img src="public/screenshots/browser-tab.png" alt="Browser tab showing a live Steel session on Google" width="800">
+<p><sub>The Browser tab. The agent opened the page; you see the live view, the session list, and controls to stop or delete it.</sub></p>
 </div>
 
 ## Features
 
-- **Responsive Design** - Works seamlessly across desktop, tablet, and mobile so you can also use Agents from mobile 
-- **Interactive Chat Interface** - Built-in chat interface for seamless communication with the Agents
-- **Integrated Shell Terminal** - Direct access to the Agents CLI through built-in shell functionality
-- **File Explorer** - Interactive file tree with syntax highlighting and live editing
-- **Git Explorer** - View, stage and commit your changes. You can also switch branches 
-- **Browser Use** - Open browser sessions for web research, testing, and agent-driven browser tasks
-- **Session Management** - Resume conversations, manage multiple sessions, and track history
-- **Plugin System** - Extend CloudCLI with custom plugins — add new tabs, backend services, and integrations. [Build your own →](https://github.com/cloudcli-ai/cloudcli-plugin-starter)
-- **TaskMaster AI Integration** *(Optional)* - Advanced project management with AI-powered task planning, PRD parsing, and workflow automation
-- **Model Compatibility** - Works with Claude and GPT model families (the full list of supported models is available at runtime via `GET /api/providers/:provider/models`)
+- **Browser** — Agents open a browser you can watch. The Browser tab shows the live page (Steel) or screenshots (local Playwright), lists every session, and lets you stop or delete one. Pop the same session into a floating window so it stays visible while you chat.
+- **Multiple agents** — Claude Code, Cursor CLI, and Codex in one workspace. Existing sessions are discovered automatically.
+- **Chat interface** — Conversations with the agents, including session resume, history, and multiple sessions per project.
+- **Shell terminal** — Direct access to the agent CLIs from a built-in terminal.
+- **File explorer** — File tree with syntax highlighting and in-place editing.
+- **Git** — View diffs, stage and commit changes, and switch branches.
+- **Responsive layout** — Works on desktop, tablet, and phone.
+- **Plugins** — Add custom tabs with their own frontend and optional Node.js backend.
+- **TaskMaster AI** *(optional)* — Task planning and PRD parsing via [TaskMaster](https://github.com/eyaltoledano/claude-task-master).
 
+## Requirements
 
-## Quick Start
+- Node.js 22 or later (see `.nvmrc`)
+- At least one agent CLI installed and signed in: Claude Code, Cursor CLI, or Codex
 
-### CloudCLI Cloud (Recommended)
+## Getting Started
 
-The fastest way to get started — no local setup required. Get a fully managed, containerized development environment accessible from the web, mobile app, API, or your favorite IDE.
-
-**[Get started with CloudCLI Cloud](https://cloudcli.ai)**
-
-### Self-Hosted (Open source)
-
-#### npm
-
-Try CloudCLI UI instantly with **npx** (requires **Node.js** v22+):
-
-```
-npx @cloudcli-ai/cloudcli
+```bash
+git clone https://github.com/Reagan1947/AgentWeb.git
+cd AgentWeb
+npm install
 ```
 
-Or install **globally** for regular use:
+Copy the example environment file and adjust it if needed:
 
-```
-npm install -g @cloudcli-ai/cloudcli
-cloudcli
-```
-
-Open `http://localhost:3001` — all your existing sessions are discovered automatically.
-
-Visit the **[documentation →](https://cloudcli.ai/docs)** for full configuration options, PM2, remote server setup and more.
-
-#### Docker Sandboxes (Experimental)
-
-Run agents in isolated sandboxes with hypervisor-level isolation. Starts Claude Code by default. Requires the [`sbx` CLI](https://docs.docker.com/ai/sandboxes/get-started/).
-
-```
-npx @cloudcli-ai/cloudcli@latest sandbox ~/my-project
+```bash
+cp .env.example .env
 ```
 
-Supports Claude Code and Codex. See the [sandbox docs](docker/) for setup and advanced options.
+### Development
 
-### Desktop Companion App
+```bash
+npm run dev
+```
 
-CloudCLI Desktop is an optional native companion for CloudCLI Cloud and Local CloudCLI. It ships from this repository's GitHub Releases and keeps CloudCLI available from your menu bar or tray.
+This starts the backend on `http://localhost:3001` and the Vite dev server on `http://localhost:5173`. Open the Vite URL in your browser.
 
-- **[macOS](https://cloudcli.ai/download/macos)**
-- **[Windows](https://cloudcli.ai/download/windows)**
-- **[Download page](https://cloudcli.ai/download)** · **[GitHub Releases and checksums](https://github.com/siteboon/claudecodeui/releases)**
+### Production
 
-Use it to open CloudCLI Cloud environments, switch between local and remote workspaces, and copy mobile/browser URLs. To work locally, choose **Local CloudCLI** in the desktop app; it will use your running local server or start one for you.
+```bash
+npm start
+```
 
+This builds the frontend and backend, then serves everything from `http://localhost:3001`. To reach it from your phone or another device on the same network, open `http://<your-ip>:3001`.
 
----
+### Desktop App
 
-## Which option is right for you?
+The Electron desktop app wraps the local server.
 
-CloudCLI UI is the open source UI layer that powers CloudCLI Cloud. You can self-host it on your own machine, run it in a Docker sandbox for isolation, or use CloudCLI Cloud for a fully managed environment.
+```bash
+npm run desktop:dev        # run against the dev server (start `npm run dev` first)
+npm run desktop:dist:mac   # build a macOS .dmg
+npm run desktop:dist:win   # build a Windows installer
+```
 
-| | Self-Hosted (npm) | Self-Hosted (Docker Sandbox) *(Experimental)* | CloudCLI Cloud |
-|---|---|---|---|
-| **Best for** | Local agent sessions on your own machine | Isolated agents with web/mobile IDE | Teams who want agents in the cloud |
-| **How you access it** | Browser via `[yourip]:port` | Browser via `localhost:port` | Browser, any IDE, REST API, n8n |
-| **Setup** | `npx @cloudcli-ai/cloudcli` | `npx @cloudcli-ai/cloudcli@latest sandbox ~/project` | No setup required |
-| **Isolation** | Runs on your host | Hypervisor-level sandbox (microVM) | Full cloud isolation |
-| **Machine needs to stay on** | Yes | Yes | No |
-| **Mobile access** | Any browser on your network | Any browser on your network | Any device |
-| **Desktop companion** | Optional. Choose Local CloudCLI | Optional. Choose Local CloudCLI | Optional. Opens cloud environments |
-| **Agents supported** | Claude Code, Cursor CLI, Codex | Claude Code, Codex | Claude Code, Cursor CLI, Codex |
-| **File explorer and Git** | Yes | Yes | Yes |
-| **MCP configuration** | Synced with `~/.claude` | Managed via UI | Managed via UI |
-| **REST API** | Yes | Yes | Yes |
-| **Team sharing** | No | No | Yes |
-| **Platform cost** | Free, open source | Free, open source | Starts at €7/month |
+## Configuration
 
-> All options use your own AI subscriptions (Claude, Cursor, etc.) — CloudCLI provides the environment, not the AI.
+Common settings in `.env`:
 
----
+| Variable | Default | Description |
+|---|---|---|
+| `SERVER_PORT` | `3001` | Backend API and WebSocket port |
+| `VITE_PORT` | `5173` | Frontend dev server port |
+| `HOST` | `0.0.0.0` | Bind address. Use `127.0.0.1` to allow local access only |
+| `CLAUDE_CLI_PATH` | `claude` | Custom path to the Claude CLI |
+| `DATABASE_PATH` | — | Custom location for the authentication database |
 
-## Security & Tools Configuration
+See [`.env.example`](.env.example) for the full list.
 
-**🔒 Important Notice**: All Claude Code tools are **disabled by default**. This prevents potentially harmful operations from running automatically.
+> **Security:** with the default `HOST=0.0.0.0`, AgentWeb is reachable from every device on your network, and the agents it runs can read and modify files on this machine. Only expose it on networks you trust.
 
-### Enabling Tools
+### Browser
 
-To use Claude Code's full functionality, you'll need to manually enable tools:
-
-1. **Open Tools Settings** - Click the gear icon in the sidebar
-2. **Enable Selectively** - Turn on only the tools you need
-3. **Apply Settings** - Your preferences are saved locally
+The Browser tab is where you follow the agent on the web. Each session shows its status, last action, and profile. From the tab you can open a floating window, go full screen, or stop and delete the session. The floating window stays over the chat, and you can send it back to the tab, minimize it, or hide it until the next session.
 
 <div align="center">
-
-![Tools Settings Modal](public/screenshots/tools-modal.png)
-*Tools Settings interface - enable only what you need*
-
+<img src="public/screenshots/browser-float.png" alt="Floating browser window over a chat" width="800">
+<p><sub>The floating window stays over the conversation, so the page stays visible while you chat.</sub></p>
 </div>
 
-**Recommended approach**: Start with basic tools enabled and add more as needed. You can always adjust these settings later.
+Enable the browser in **Settings > Browser**. Without further setup, sessions run on local Playwright and the Browser tab shows screenshots. If Chromium dependencies are missing, run:
 
----
+```bash
+npx playwright install-deps chromium
+```
+
+For a live, interactive view, install and run [Steel](https://github.com/steel-dev/steel-browser), then set its address in the same settings page (default `http://127.0.0.1:3000`). An API key is only needed for Steel Cloud.
 
 ## Plugins
 
-CloudCLI has a plugin system that lets you add custom tabs with their own frontend UI and optional Node.js backend. Install plugins from git repos directly in **Settings > Plugins**, or build your own.
+Install plugins from a git repository in **Settings > Plugins**. To write your own, start from the [plugin starter template](https://github.com/cloudcli-ai/cloudcli-plugin-starter) or the local copy in [`plugins/starter`](plugins/starter).
 
-### Available Plugins
+Plugins are installed with `git clone` and updated with `git pull`, using the git credentials of the operating-system user running the server. The server cannot answer password or passphrase prompts, so for private repositories set up credentials for that user first:
 
-| Plugin | Description |
+- **`https://` URLs** — configure a credential helper, for example `gh auth login` followed by `gh auth setup-git`.
+- **`git@` URLs** — use an SSH key that works without a prompt (no passphrase, or loaded into an `ssh-agent` the server inherits), and add the host to `~/.ssh/known_hosts`.
+
+## Development Commands
+
+| Command | Description |
 |---|---|
-| **[Project Stats](https://github.com/cloudcli-ai/cloudcli-plugin-starter)** | Shows file counts, lines of code, file-type breakdown, largest files, and recently modified files for your current project |
-| **[Web Terminal](https://github.com/cloudcli-ai/cloudcli-plugin-terminal)** | Full xterm.js terminal with multi-tab support |
-| **[CloudCLI Scheduler](https://github.com/grostim/cloudcli-cron)** | Create workspace-scoped scheduled prompts and execute them through a local CLI such as Codex or Claude Code |
-| **[PRISM CloudCLI](https://github.com/jakeefr/cloudcli-plugin-prism)** | Session intelligence for Claude Code inside CloudCLI, including token burn visibility |
-| **[Sessions](https://github.com/strykereye2/cloudcli-plugin-session-manager)** | View, manage, and kill active Claude Code sessions |
-| **[Token Cost Calculator](https://github.com/NightmareAway/cloudcli-plugin-token-cost-calculator)** | Calculate API costs from model prices and token usage, with preset model pricing support |
-| **[Task Queue](https://github.com/TadMSTR/cloudcli-plugin-task-queue)** | Task queue dashboard to view, filter, and launch agent tasks |
-| **[GitHub Issues Board](https://github.com/szmidtpiotr/claude-github-issue)** | Kanban board for GitHub Issues with bidirectional TaskMaster sync and /github-task CLI skill auto-install |
+| `npm run dev` | Start backend and frontend in development mode |
+| `npm run build` | Build the frontend and backend |
+| `npm run typecheck` | Type-check the frontend and backend |
+| `npm run lint` | Lint `src/` and `server/` |
+| `npm test` | Run backend tests |
+| `npm run test:client` | Run frontend tests |
 
-### Build Your Own
-
-**[Plugin Starter Template →](https://github.com/cloudcli-ai/cloudcli-plugin-starter)** — fork this repo to create your own plugin. It includes a working example with frontend rendering, live context updates, and RPC communication to a backend server.
-
-**[Plugin Documentation →](https://cloudcli.ai/docs/plugin-overview)** — full guide to the plugin API, manifest format, security model, and more.
-
-### Private Repositories
-
-The server installs and updates plugins with `git clone` and `git pull`, using the git credentials of the operating-system user it runs as (for a systemd service, the unit's `User=`). The server cannot answer a password or passphrase prompt during an install, so set up credentials for that user before installing from a private repository:
-
-- **`https://` URLs:** configure a git credential helper, for example `gh auth login` followed by `gh auth setup-git`, or a token in `~/.git-credentials` with `git config --global credential.helper store`.
-- **`git@` URLs:** give that user an SSH key the git host accepts and that works without a prompt: either it has no passphrase, or it is loaded into an `ssh-agent` whose `SSH_AUTH_SOCK` the server process inherits. Also add the host to that user's `~/.ssh/known_hosts`, for example by running `ssh -T git@github.com` once as that user.
-
-Without credentials, an `https://` install fails with a message saying that the repository is private or does not exist. Most git hosts, GitHub included, answer the same way for both. If the host rejects the credentials (wrong, expired or revoked), or ssh cannot log in for a `git@` URL, the message says so.
-
----
-## FAQ
-
-<details>
-<summary>How is this different from Claude Code Remote Control?</summary>
-
-Claude Code Remote Control lets you send messages to a session already running in your local terminal. Your machine has to stay on, your terminal has to stay open, and sessions time out after roughly 10 minutes without a network connection.
-
-CloudCLI UI and CloudCLI Cloud extend Claude Code rather than sit alongside it — your MCP servers, permissions, settings, and sessions are the exact same ones Claude Code uses natively. Nothing is duplicated or managed separately.
-
-Here's what that means in practice:
-
-- **All your sessions, not just one** — CloudCLI UI auto-discovers every session from your `~/.claude` folder. Remote Control only exposes the single active session to make it available in the Claude mobile app.
-- **Your settings are your settings** — MCP servers, tool permissions, and project config you change in CloudCLI UI are written directly to your Claude Code config and take effect immediately, and vice versa.
-- **Works with more agents** — Claude Code, Cursor CLI and Codex, not just Claude Code.
-- **Full UI, not just a chat window** — file explorer, Git integration, MCP management, and a shell terminal are all built in.
-- **CloudCLI Cloud runs in the cloud** — close your laptop, the agent keeps running. No terminal to babysit, no machine to keep awake.
-
-</details>
-
-<details>
-<summary>Do I need to pay for an AI subscription separately?</summary>
-
-Yes. CloudCLI provides the environment, not the AI. You bring your own Claude, Cursor, or Codex subscription. CloudCLI Cloud starts at €7/month for the hosted environment on top of that.
-
-</details>
-
-<details>
-<summary>Can I use CloudCLI UI on my phone?</summary>
-
-Yes. For self-hosted, run the server on your machine and open `[yourip]:port` in any browser on your network. For CloudCLI Cloud, open it from any device — no VPN, no port forwarding, no setup. A native app is also in the works.
-
-</details>
-
-<details>
-<summary>Will changes I make in the UI affect my local Claude Code setup?</summary>
-
-Yes, for self-hosted. CloudCLI UI reads from and writes to the same `~/.claude` config that Claude Code uses natively. MCP servers you add via the UI show up in Claude Code immediately and vice versa.
-
-</details>
-
----
-
-## Community & Support
-
-- **[Documentation](https://cloudcli.ai/docs)** — installation, configuration, features, and troubleshooting
-- **[Discord](https://discord.gg/buxwujPNRE)** — get help and connect with other users
-- **[GitHub Issues](https://github.com/siteboon/claudecodeui/issues)** — bug reports and feature requests
-- **[Contributing Guide](CONTRIBUTING.md)** — how to contribute to the project
+See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
 
 ## License
 
-GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later) — see [LICENSE](LICENSE) for the full text, including additional terms under Section 7.
+GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later). See [LICENSE](LICENSE) for the full text, including additional terms under Section 7, and [NOTICE](NOTICE).
 
-This project is open source and free to use, modify, and distribute under the AGPL-3.0-or-later license. If you modify this software and run it as a network service, you must make your modified source code available to users of that service.
-
-CloudCLI UI - (https://cloudcli.ai).
+If you modify this software and run it as a network service, you must make your modified source code available to the users of that service.
 
 ## Acknowledgments
 
-### Based on
-
-- **[CloudCLI UI](https://github.com/siteboon/claudecodeui)** — the upstream project. AgentWeb builds on that codebase and adds interactive-interface refinements.
-
-### Built With
-- **[Claude Code](https://docs.anthropic.com/en/docs/claude-code)** - Anthropic's official CLI
-- **[Cursor CLI](https://docs.cursor.com/en/cli/overview)** - Cursor's official CLI
-- **[Codex](https://developers.openai.com/codex)** - OpenAI Codex
-- **[React](https://react.dev/)** - User interface library
-- **[Vite](https://vitejs.dev/)** - Fast build tool and dev server
-- **[Tailwind CSS](https://tailwindcss.com/)** - Utility-first CSS framework
-- **[CodeMirror](https://codemirror.net/)** - Advanced code editor
-- **[TaskMaster AI](https://github.com/eyaltoledano/claude-task-master)** *(Optional)* - AI-powered project management and task planning
-
-
-### Sponsors
-- [Siteboon - AI powered website builder](https://siteboon.ai)
----
-
-<div align="center">
- <strong>Made with care for the Claude Code, Cursor and Codex community.</strong>
-</div>
+- **[CloudCLI UI](https://github.com/siteboon/claudecodeui)** — the upstream project AgentWeb is based on.
+- **[Claude Code](https://docs.anthropic.com/en/docs/claude-code)**, **[Cursor CLI](https://docs.cursor.com/en/cli/overview)**, and **[Codex](https://developers.openai.com/codex)** — the agent CLIs AgentWeb works with.
+- **[React](https://react.dev/)**, **[Vite](https://vitejs.dev/)**, **[Tailwind CSS](https://tailwindcss.com/)**, and **[CodeMirror](https://codemirror.net/)**.

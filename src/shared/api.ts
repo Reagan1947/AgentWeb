@@ -607,7 +607,9 @@ export const api = {
     status: () => get('/api/browser-use/status'),
     settings: () => get('/api/browser-use/settings'),
     saveSettings: (settings: unknown) => put('/api/browser-use/settings', settings),
-    sessions: () => get('/api/browser-use/sessions'),
+    sessions: (options: { compact?: boolean } = {}) => get(
+      options.compact ? '/api/browser-use/sessions?compact=true' : '/api/browser-use/sessions',
+    ),
     stopSession: (sessionId: string) => post(`/api/browser-use/sessions/${sessionId}/stop`),
     deleteSession: (sessionId: string) => del(`/api/browser-use/sessions/${sessionId}`),
     installRuntime: () => post('/api/browser-use/runtime/install'),

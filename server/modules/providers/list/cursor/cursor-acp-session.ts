@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type { Readable, Writable } from 'node:stream';
 
 import {
@@ -5,6 +6,7 @@ import {
   appendImagesInputTag,
 } from '@/shared/image-attachments.js';
 import { notifyRunFailed, notifyRunStopped } from '@/modules/notifications/index.js';
+import { ensureCursorAcpSessionStore } from '@/modules/providers/list/cursor/cursor-session-store.js';
 import type { ProviderPermissionDecision } from '@/shared/types.js';
 import { createCompleteMessage, createNormalizedMessage, flattenPromptForWindowsShell } from '@/shared/utils.js';
 
@@ -24,7 +26,7 @@ type JsonRpcMessage = {
   method?: string;
   params?: unknown;
   result?: unknown;
-  error?: { message?: string };
+  error?: { message?: string; data?: { message?: string } };
 };
 
 type PendingRpc = {
@@ -282,7 +284,7 @@ export class CursorAcpConnection {
       }
       this.pending.delete(message.id);
       if (message.error) {
-        pending.reject(new Error(message.error.message || 'Cursor ACP request failed'));
+        pending.reject(new Error(message.error.data?.message || message.error.message || 'Cursor ACP request failed'));
         return;
       }
       pending.resolve(message.result);
@@ -300,6 +302,25 @@ function updateBody(params: unknown): Record<string, unknown> {
     return {};
   }
   return isRecord(params.update) ? params.update : params;
+}
+
+/**
+ * ACP lists models as `name[option=value,...]` (Auto is `default[]`), while
+ * Agent Web stores the plain `-p` names such as `auto` or `gpt-5.5`. Returns
+ * the ACP id for the stored name, or null when this server does not offer it.
+ */
+export function matchAcpModelId(model: string | null | undefined, models: unknown): string | null {
+  if (!model || !isRecord(models) || !Array.isArray(models.availableModels)) {
+    return null;
+  }
+  const wanted = model === 'auto' ? 'default' : model;
+  for (const entry of models.availableModels) {
+    const modelId = isRecord(entry) && typeof entry.modelId === 'string' ? entry.modelId : '';
+    if (modelId === model || modelId === wanted || modelId.startsWith(`${wanted}[`)) {
+      return modelId;
+    }
+  }
+  return null;
 }
 
 function textOf(content: unknown): string {
@@ -333,6 +354,41 @@ export async function runCursorAcpSession(input: CursorAcpRunInput): Promise<voi
       sessionId: sessionId || null,
       provider: 'cursor',
     } as Parameters<typeof createNormalizedMessage>[0]));
+  };
+
+  // ACP streams a thought a few words at a time. The chat renders every
+  // `thinking` message as its own row, so one thought is sent as one message.
+  let thoughtBuffer = '';
+  const flushThought = () => {
+    if (thoughtBuffer.trim()) {
+      send({ kind: 'thinking', content: thoughtBuffer });
+    }
+    thoughtBuffer = '';
+  };
+
+  // The chat folds every `stream_delta` into one live row until `stream_end`,
+  // and Cursor stores each reply segment around a tool call as its own row. A
+  // segment left open merges with the next one, matches nothing on disk, and
+  // is then never retired by the history refresh.
+  let messageOpen = false;
+  const closeMessage = () => {
+    if (messageOpen) {
+      send({ kind: 'stream_end' });
+    }
+    messageOpen = false;
+  };
+
+  const deferredToolCalls = new Set<string>();
+  const emitToolUse = (toolId: string, update: Record<string, unknown>) => {
+    sawToolCall.add(toolId);
+    const rawInput = update.rawInput;
+    const mcpArgs = isRecord(rawInput) && typeof rawInput.providerIdentifier === 'string' ? rawInput.args : undefined;
+    send({
+      kind: 'tool_use',
+      toolId,
+      toolName: typeof update.title === 'string' ? update.title : 'Tool',
+      toolInput: mcpArgs ?? rawInput,
+    });
   };
 
   const finish = (code: number | null, error?: Error) => {
@@ -385,9 +441,9 @@ export async function runCursorAcpSession(input: CursorAcpRunInput): Promise<voi
       const kind = isRecord(message.params) && isRecord(message.params.toolCall) && typeof message.params.toolCall.kind === 'string'
         ? message.params.toolCall.kind
         : '';
-      const requestId = typeof message.id === 'string' || typeof message.id === 'number'
-        ? `cursor-acp-${message.id}`
-        : `cursor-acp-${Date.now()}`;
+      // The CLI numbers its JSON-RPC requests per process, so two chats waiting
+      // at once would share an id and one click would answer the wrong chat.
+      const requestId = `cursor-acp-${randomUUID()}`;
 
       if (acceptsEditWithoutPrompt(input.options.permissionMode, kind)) {
         return {
@@ -398,6 +454,8 @@ export async function runCursorAcpSession(input: CursorAcpRunInput): Promise<voi
         };
       }
 
+      closeMessage();
+      flushThought();
       const decisionPromise = waitForApproval({
         requestId,
         toolName: described.toolName,
@@ -434,45 +492,41 @@ export async function runCursorAcpSession(input: CursorAcpRunInput): Promise<voi
       }
       const update = updateBody(message.params);
       const sessionUpdate = typeof update.sessionUpdate === 'string' ? update.sessionUpdate : '';
+      if (sessionUpdate === 'agent_thought_chunk') {
+        closeMessage();
+        thoughtBuffer += textOf(update.content);
+        return;
+      }
+      flushThought();
       if (sessionUpdate === 'agent_message_chunk') {
         const text = textOf(update.content);
         if (text) {
+          messageOpen = true;
           send({ kind: 'stream_delta', content: text });
         }
         return;
       }
-      if (sessionUpdate === 'agent_thought_chunk') {
-        const text = textOf(update.content);
-        if (text) {
-          send({ kind: 'thinking', content: text });
-        }
-        return;
-      }
+      closeMessage();
       if (sessionUpdate === 'tool_call') {
         const toolId = typeof update.toolCallId === 'string' ? update.toolCallId : '';
         if (!toolId || sawToolCall.has(toolId)) {
           return;
         }
-        sawToolCall.add(toolId);
-        send({
-          kind: 'tool_use',
-          toolId,
-          toolName: typeof update.title === 'string' ? update.title : 'Tool',
-          toolInput: update.rawInput,
-        });
+        // MCP calls open as a generic "MCP: tool" and name the real tool in
+        // the first update, so the row waits for that name.
+        if (update.title === 'MCP: tool') {
+          deferredToolCalls.add(toolId);
+          return;
+        }
+        emitToolUse(toolId, update);
         return;
       }
       if (sessionUpdate === 'tool_call_update') {
         const toolId = typeof update.toolCallId === 'string' ? update.toolCallId : '';
         const status = typeof update.status === 'string' ? update.status : '';
-        if (toolId && !sawToolCall.has(toolId)) {
-          sawToolCall.add(toolId);
-          send({
-            kind: 'tool_use',
-            toolId,
-            toolName: typeof update.title === 'string' ? update.title : 'Tool',
-            toolInput: update.rawInput,
-          });
+        if (toolId && !sawToolCall.has(toolId) && (typeof update.title === 'string' || !deferredToolCalls.has(toolId) || status === 'completed' || status === 'failed')) {
+          deferredToolCalls.delete(toolId);
+          emitToolUse(toolId, update);
         }
         if (status === 'completed' || status === 'failed') {
           const output = update.rawOutput ?? update.content;
@@ -502,8 +556,8 @@ export async function runCursorAcpSession(input: CursorAcpRunInput): Promise<voi
   child.on('close', () => {
     connection.failPending(new Error('Cursor ACP exited before the turn finished'));
   });
-  child.on('error', () => {
-    connection.failPending(new Error('Cursor ACP process failed to start'));
+  child.on('error', (error) => {
+    connection.failPending(new Error(`Cursor ACP process failed to start: ${error.message}`));
   });
 
   const closed = new Promise<number | null>((resolve) => {
@@ -521,24 +575,43 @@ export async function runCursorAcpSession(input: CursorAcpRunInput): Promise<voi
       },
     });
 
-    const sessionParams = input.providerSessionId
-      ? { sessionId: input.providerSessionId, cwd, mcpServers: [] }
-      : { cwd, mcpServers: [] };
-    const created = await connection.request(
-      input.providerSessionId ? 'session/load' : 'session/new',
-      sessionParams,
-    ) as { sessionId?: string };
-    const providerSessionId = created?.sessionId || input.providerSessionId;
-    if (providerSessionId && !input.providerSessionId) {
+    if (input.providerSessionId) {
+      ensureCursorAcpSessionStore(input.providerSessionId, cwd);
+    }
+    type OpenedSession = { sessionId?: string; models?: unknown };
+    let created: OpenedSession | null = null;
+    let resumed = Boolean(input.providerSessionId);
+    if (input.providerSessionId) {
+      try {
+        created = await connection.request('session/load', {
+          sessionId: input.providerSessionId,
+          cwd,
+          mcpServers: [],
+        }) as OpenedSession;
+      } catch (error) {
+        // A chat stopped before its first turn finished is never written to
+        // disk, so there is no history to lose by starting a fresh one.
+        if (!(error instanceof Error) || !/not found/i.test(error.message)) {
+          throw error;
+        }
+        resumed = false;
+      }
+    }
+    if (!resumed) {
+      created = await connection.request('session/new', { cwd, mcpServers: [] }) as OpenedSession;
+    }
+    const providerSessionId = (resumed ? input.providerSessionId : created?.sessionId) || input.providerSessionId;
+    if (providerSessionId && !resumed) {
       input.writer.setSessionId?.(providerSessionId);
       send({ kind: 'session_created', newSessionId: providerSessionId });
     }
 
-    if (input.resolvedModel && providerSessionId) {
+    const acpModelId = matchAcpModelId(input.resolvedModel, created?.models);
+    if (acpModelId && providerSessionId) {
       try {
         await connection.request('session/set_model', {
           sessionId: providerSessionId,
-          modelId: input.resolvedModel,
+          modelId: acpModelId,
         });
       } catch {
         // A model the ACP server does not expose should not block the turn.
@@ -565,6 +638,8 @@ export async function runCursorAcpSession(input: CursorAcpRunInput): Promise<voi
       sessionId: providerSessionId,
       prompt: [{ type: 'text', text: prompt }],
     });
+    flushThought();
+    closeMessage();
     if (!child.aborted && !completeSent) {
       completeSent = true;
       input.writer.send(createCompleteMessage({

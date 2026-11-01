@@ -91,6 +91,32 @@ test('launching through Steel stores the live view and connects over CDP', async
   assert.match(launched.debugUrl || '', /showControls=true/);
   assert.equal(calls.length, 1);
   assert.equal('websocketUrl' in launched, false);
+  assert.equal(launched.steelExclusive, false);
+});
+
+test('self-hosted Steel that shares one websocket across sessions is marked exclusive', async () => {
+  const launched = await launchAgentBrowser({
+    playwright: {
+      chromium: {
+        connectOverCDP: async () => ({
+          contexts: () => [{ pages: () => [{ url: () => 'about:blank' }] }],
+        }),
+      },
+    },
+    steelBaseUrl: 'http://127.0.0.1:3000',
+    steelApiKey: '',
+    profilePath: null,
+    viewport,
+    allowLocalFallback: true,
+    fetchImpl: async () => jsonResponse(200, {
+      id: '8604b5d9-43be-4a33-8d23-ab65f25e26e6',
+      websocketUrl: 'ws://127.0.0.1:3000/',
+      debugUrl: 'http://127.0.0.1:3000/v1/sessions/debug',
+    }),
+  });
+
+  assert.equal(launched.provider, 'steel');
+  assert.equal(launched.steelExclusive, true);
 });
 
 test('a failed Steel connection falls back to local Playwright and releases the Steel session', async () => {

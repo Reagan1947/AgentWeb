@@ -1,19 +1,15 @@
 import { Palette, RotateCcw, Shield, ShieldOff, X } from 'lucide-react';
 
-import { LLMProviderLogo } from '@/shared/ui';
-import type { LLMProvider } from '@/shared/types';
+import { Button } from '@/shared/ui';
+import { cn } from '@/shared/utils';
+import { WORKSPACE_PANE_ACTION_CLASS, WORKSPACE_PANE_TOOLBAR_CHROME_CLASS } from '@/shared/constants';
 
 type ShellHeaderProps = {
   isConnected: boolean;
   isInitialized: boolean;
   isRestarting: boolean;
-  hasSession: boolean;
-  /** The same session title the chat header shows, or null when no session is open. */
-  sessionTitle: string | null;
-  sessionProvider?: LLMProvider | null;
   onDisconnect: () => void;
   onRestart: () => void;
-  statusNewSessionText: string;
   statusInitializingText: string;
   statusRestartingText: string;
   showThemeRestartHint: boolean;
@@ -30,17 +26,13 @@ type ShellHeaderProps = {
   bypassTitle: string;
 };
 
-/** Rendered by Shell above the terminal to show the session title, connection status, and the restart/disconnect actions. */
+/** Rendered by Shell above the terminal. The session name used to sit here; the disconnect and restart actions take that spot. */
 export default function ShellHeader({
   isConnected,
   isInitialized,
   isRestarting,
-  hasSession,
-  sessionTitle,
-  sessionProvider = null,
   onDisconnect,
   onRestart,
-  statusNewSessionText,
   statusInitializingText,
   statusRestartingText,
   showThemeRestartHint,
@@ -57,73 +49,60 @@ export default function ShellHeader({
   bypassTitle,
 }: ShellHeaderProps) {
   return (
-    <div className="flex-shrink-0 border-b border-border bg-background px-4 py-3">
-      {/* Same floor as the workspace tab bar, so this strip does not turn into a card when the shell opens. */}
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex min-w-0 flex-1 items-center gap-2">
-          <div className={`h-2 w-2 flex-shrink-0 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
-
-          {hasSession && sessionTitle ? (
-            <>
-              {sessionProvider && <LLMProviderLogo provider={sessionProvider} className="h-4 w-4 flex-shrink-0" />}
-              <span className="min-w-0 truncate text-sm font-semibold leading-tight text-foreground">{sessionTitle}</span>
-            </>
-          ) : (
-            !hasSession && (
-              <span className="min-w-0 truncate text-sm font-semibold leading-tight text-foreground">{statusNewSessionText}</span>
-            )
-          )}
-
-          {!isInitialized && <span className="text-xs text-yellow-700 dark:text-yellow-400">{statusInitializingText}</span>}
-
-          {isRestarting && <span className="text-xs text-primary">{statusRestartingText}</span>}
-        </div>
-
-        <div className="flex items-center gap-2">
-          {showBypassToggle && (
-            <button
-              type="button"
-              onClick={onToggleBypass}
-              aria-pressed={bypassEnabled}
-              className={`inline-flex h-8 items-center gap-1.5 rounded-md border px-3 text-xs font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-background ${
-                bypassEnabled
-                  ? 'border-orange-700 bg-orange-700 text-white hover:bg-orange-800 focus:ring-orange-400/70 dark:border-orange-500/70 dark:bg-orange-600/80 dark:hover:bg-orange-700'
-                  : 'border-input bg-background text-foreground shadow-sm hover:border-orange-700 hover:bg-orange-700 hover:text-white focus:ring-orange-400/70 dark:hover:border-orange-400/70 dark:hover:bg-orange-600/60'
-              }`}
-              title={bypassTitle}
-            >
-              {bypassEnabled ? (
-                <ShieldOff className="h-3.5 w-3.5" aria-hidden="true" />
-              ) : (
-                <Shield className="h-3.5 w-3.5" aria-hidden="true" />
-              )}
-              <span>{bypassLabel}</span>
-            </button>
-          )}
-
-          {isConnected && (
-            <button
-              type="button"
-              onClick={onDisconnect}
-              className="inline-flex h-6 items-center gap-1 rounded-md bg-red-600 px-2 text-[11px] font-medium text-white transition-colors hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-400/70 focus:ring-offset-2 focus:ring-offset-background"
-              title={disconnectTitle}
-            >
-              <X className="h-3 w-3" aria-hidden="true" />
-              <span>{disconnectLabel}</span>
-            </button>
-          )}
-
-          <button
+    <div className={cn('flex-shrink-0', WORKSPACE_PANE_TOOLBAR_CHROME_CLASS)}>
+      <div className="flex min-w-0 flex-wrap items-center gap-1">
+        {showBypassToggle && (
+          <Button
             type="button"
-            onClick={onRestart}
-            disabled={disableRestart}
-            className="inline-flex h-6 items-center gap-1 rounded-md border border-input bg-background px-2 text-[11px] font-medium text-foreground transition-colors hover:border-primary hover:bg-primary hover:text-primary-foreground focus:outline-none focus:ring-2 focus:ring-ring/50 disabled:cursor-not-allowed disabled:border-transparent disabled:bg-transparent disabled:text-muted-foreground disabled:opacity-40"
-            title={restartTitle}
+            variant="outline"
+            size="sm"
+            onClick={onToggleBypass}
+            aria-pressed={bypassEnabled}
+            title={bypassTitle}
+            className={cn(
+              WORKSPACE_PANE_ACTION_CLASS,
+              bypassEnabled && 'border-orange-700 bg-orange-700 text-white hover:bg-orange-800 hover:text-white dark:border-orange-500/70 dark:bg-orange-600/80 dark:hover:bg-orange-700',
+            )}
           >
-            <RotateCcw className={`h-3 w-3 ${isRestarting ? 'animate-spin' : ''}`} aria-hidden="true" />
-            <span>{restartLabel}</span>
-          </button>
-        </div>
+            {bypassEnabled ? (
+              <ShieldOff aria-hidden="true" />
+            ) : (
+              <Shield aria-hidden="true" />
+            )}
+            <span>{bypassLabel}</span>
+          </Button>
+        )}
+
+        {isConnected && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onDisconnect}
+            title={disconnectTitle}
+            className={cn(WORKSPACE_PANE_ACTION_CLASS, 'text-red-600 hover:bg-red-600/10 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300')}
+          >
+            <X aria-hidden="true" />
+            <span>{disconnectLabel}</span>
+          </Button>
+        )}
+
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={onRestart}
+          disabled={disableRestart}
+          title={restartTitle}
+          className={WORKSPACE_PANE_ACTION_CLASS}
+        >
+          <RotateCcw className={isRestarting ? 'animate-spin' : ''} aria-hidden="true" />
+          <span>{restartLabel}</span>
+        </Button>
+
+        {!isInitialized && <span className="text-xs text-yellow-700 dark:text-yellow-400">{statusInitializingText}</span>}
+
+        {isRestarting && <span className="text-xs text-primary">{statusRestartingText}</span>}
       </div>
 
       {/* A running Claude CLI keeps the theme it was launched in; Restart applies the new one. */}

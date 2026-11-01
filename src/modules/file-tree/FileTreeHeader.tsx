@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 
 import { Button, Input } from '@/shared/ui';
 import { cn } from '@/shared/utils';
-import { MAX_FILE_UPLOAD_SIZE_LABEL } from '@/shared/constants';
+import { MAX_FILE_UPLOAD_SIZE_LABEL, WORKSPACE_PANE_ICON_ACTION_CLASS, WORKSPACE_PANE_TOOLBAR_CHROME_CLASS } from '@/shared/constants';
 import type { FileTreeViewMode } from '@/shared/types';
 
 type FileTreeHeaderProps = {
@@ -54,11 +54,9 @@ export default function FileTreeHeader({
   };
 
   return (
-    <div className="space-y-2 border-b border-border px-3 pb-2 pt-3">
-      {/* Title and Toolbar */}
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-medium text-foreground">{t('fileTree.files')}</h3>
-        <div className="flex items-center gap-0.5">
+    <div className={cn('space-y-2', WORKSPACE_PANE_TOOLBAR_CHROME_CLASS)}>
+      <div className="flex items-center">
+        <div className="flex items-center gap-1">
           {/* Action buttons */}
           {onUploadFiles && (
             <>
@@ -72,9 +70,9 @@ export default function FileTreeHeader({
                 aria-hidden="true"
               />
               <Button
-                variant="ghost"
+                variant="outline"
                 size="sm"
-                className="relative h-7 w-7 p-0"
+                className={cn(WORKSPACE_PANE_ICON_ACTION_CLASS, 'relative')}
                 onClick={() => uploadInputRef.current?.click()}
                 title={
                   isUploading
@@ -106,9 +104,9 @@ export default function FileTreeHeader({
           )}
           {onNewFile && (
             <Button
-              variant="ghost"
+              variant="outline"
               size="sm"
-              className="h-7 w-7 p-0"
+              className={WORKSPACE_PANE_ICON_ACTION_CLASS}
               onClick={onNewFile}
               title={t('fileTree.newFile', 'New File (Cmd+N)')}
               aria-label={t('fileTree.newFile', 'New File (Cmd+N)')}
@@ -119,9 +117,9 @@ export default function FileTreeHeader({
           )}
           {onNewFolder && (
             <Button
-              variant="ghost"
+              variant="outline"
               size="sm"
-              className="h-7 w-7 p-0"
+              className={WORKSPACE_PANE_ICON_ACTION_CLASS}
               onClick={onNewFolder}
               title={t('fileTree.newFolder', 'New Folder (Cmd+Shift+N)')}
               aria-label={t('fileTree.newFolder', 'New Folder (Cmd+Shift+N)')}
@@ -132,9 +130,9 @@ export default function FileTreeHeader({
           )}
           {onRefresh && (
             <Button
-              variant="ghost"
+              variant="outline"
               size="sm"
-              className="h-7 w-7 p-0"
+              className={WORKSPACE_PANE_ICON_ACTION_CLASS}
               onClick={onRefresh}
               title={t('fileTree.refresh', 'Refresh')}
               aria-label={t('fileTree.refresh', 'Refresh')}
@@ -145,9 +143,9 @@ export default function FileTreeHeader({
           )}
           {onCollapseAll && (
             <Button
-              variant="ghost"
+              variant="outline"
               size="sm"
-              className="h-7 w-7 p-0"
+              className={WORKSPACE_PANE_ICON_ACTION_CLASS}
               onClick={onCollapseAll}
               title={t('fileTree.collapseAll', 'Collapse All')}
               aria-label={t('fileTree.collapseAll', 'Collapse All')}
@@ -159,9 +157,9 @@ export default function FileTreeHeader({
           <div className="mx-0.5 h-4 w-px bg-border" />
           {/* View mode buttons */}
           <Button
-            variant={viewMode === 'simple' ? 'default' : 'ghost'}
+            variant="outline"
             size="sm"
-            className="h-7 w-7 p-0"
+            className={cn(WORKSPACE_PANE_ICON_ACTION_CLASS, viewMode === 'simple' && 'border-primary bg-accent')}
             onClick={() => onViewModeChange('simple')}
             title={t('fileTree.simpleView')}
             aria-label={t('fileTree.simpleView')}
@@ -169,9 +167,9 @@ export default function FileTreeHeader({
             <List className="h-3.5 w-3.5" />
           </Button>
           <Button
-            variant={viewMode === 'compact' ? 'default' : 'ghost'}
+            variant="outline"
             size="sm"
-            className="h-7 w-7 p-0"
+            className={cn(WORKSPACE_PANE_ICON_ACTION_CLASS, viewMode === 'compact' && 'border-primary bg-accent')}
             onClick={() => onViewModeChange('compact')}
             title={t('fileTree.compactView')}
             aria-label={t('fileTree.compactView')}
@@ -179,9 +177,9 @@ export default function FileTreeHeader({
             <Eye className="h-3.5 w-3.5" />
           </Button>
           <Button
-            variant={viewMode === 'detailed' ? 'default' : 'ghost'}
+            variant="outline"
             size="sm"
-            className="h-7 w-7 p-0"
+            className={cn(WORKSPACE_PANE_ICON_ACTION_CLASS, viewMode === 'detailed' && 'border-primary bg-accent')}
             onClick={() => onViewModeChange('detailed')}
             title={t('fileTree.detailedView')}
             aria-label={t('fileTree.detailedView')}

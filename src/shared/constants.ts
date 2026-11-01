@@ -285,3 +285,39 @@ export const PROVIDER_PERMISSION_PREFERENCE_KEYS: Record<LLMProvider, UserPrefer
  */
 export const SELECTED_SESSION_ROW_CLASS =
   'bg-[#dbdbdc] text-[#1d1d1f] hover:bg-[#dbdbdc] dark:bg-[#2b2b2b] dark:text-[#ffffff] dark:hover:bg-[#2b2b2b]';
+
+// ---------------------------
+
+//----------------- WORKSPACE PANE TOOLBARS ------------
+
+/**
+ * Chrome for the action strip under the workspace tab bar on Shell, Files, Browser, and Source Control.
+ * Those panes share this hairline, floor, and padding so the row opens at the same size.
+ */
+export const WORKSPACE_PANE_TOOLBAR_CHROME_CLASS =
+  'border-b border-border/60 bg-background px-3 py-2';
+
+/**
+ * Labeled action on that strip. Use with Button variant "outline" and size "sm".
+ * 28px tall, 12px label, 14px icon.
+ */
+export const WORKSPACE_PANE_ACTION_CLASS =
+  'h-7 gap-1.5 px-2 text-xs font-medium [&_svg]:size-3.5';
+
+/**
+ * Icon-only outline action on the same strip. Same height and icon size as the labeled action.
+ * Use with Button variant "outline" and size "sm".
+ */
+export const WORKSPACE_PANE_ICON_ACTION_CLASS =
+  'h-7 w-7 p-0 [&_svg]:size-3.5';
+
+// ---------------------------
+
+//----------------- PORTAL TARGETS ------------
+
+/**
+ * Name of the slot left of the chat transcript's export button. The chat module
+ * registers it with useRegisterPortalTarget; the browser-use module portals its
+ * minimized live-browser chip into it through usePortalTarget.
+ */
+export const CHAT_HEADER_ACTIONS_PORTAL = 'chat-header-actions';

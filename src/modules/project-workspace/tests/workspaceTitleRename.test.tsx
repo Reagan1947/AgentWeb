@@ -51,12 +51,16 @@ const session: ProjectSession = {
 
 const onRenameSession = vi.fn<(sessionId: string, summary: string) => Promise<boolean>>();
 
-const renderTitle = (overrides: { selectedSession?: ProjectSession | null; activeTab?: 'chat' | 'files' } = {}) => render(
+const renderTitle = (overrides: {
+  selectedSession?: ProjectSession | null;
+  activeTab?: 'chat' | 'files' | 'shell' | 'git' | 'browser' | 'tasks';
+  shouldShowTasksTab?: boolean;
+} = {}) => render(
   <WorkspaceTitle
     activeTab={overrides.activeTab ?? 'chat'}
     selectedProject={project}
     selectedSession={overrides.selectedSession === undefined ? session : overrides.selectedSession}
-    shouldShowTasksTab={false}
+    shouldShowTasksTab={overrides.shouldShowTasksTab ?? false}
     onRenameSession={onRenameSession}
   />,
 );
@@ -176,6 +180,27 @@ test('a refused rename is reported the way the sidebar reports it', async () => 
 
   assert.deepEqual(alertSpy.mock.calls, [['sidebar:messages.renameSessionFailed']]);
   assert.equal(queryRenameInput(), null);
+});
+
+test('tabs other than chat title the header with that tab function', () => {
+  const { unmount } = renderTitle({ activeTab: 'shell' });
+  assert.equal(titleHeading().textContent, 'tabs.shell');
+  unmount();
+
+  const files = renderTitle({ activeTab: 'files' });
+  assert.equal(titleHeading().textContent, 'tabs.files');
+  files.unmount();
+
+  const git = renderTitle({ activeTab: 'git' });
+  assert.equal(titleHeading().textContent, 'tabs.git');
+  git.unmount();
+
+  const browser = renderTitle({ activeTab: 'browser' });
+  assert.equal(titleHeading().textContent, 'tabs.browser');
+  browser.unmount();
+
+  renderTitle({ activeTab: 'tasks', shouldShowTasksTab: true });
+  assert.equal(titleHeading().textContent, 'tabs.tasks');
 });
 
 test('the title is not editable without a session or off the chat tab', () => {

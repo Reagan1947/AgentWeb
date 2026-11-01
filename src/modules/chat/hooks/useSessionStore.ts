@@ -302,10 +302,22 @@ function pruneRealtimeSupersededByServer(
   }
 
   const serverIds = new Set(serverMessages.map((message) => message.id));
+  // Providers such as Cursor give a thought a different id on disk than the
+  // one it streamed with, so a persisted thought is recognised by its text.
+  const serverThoughts = new Set(
+    serverMessages
+      .filter((message) => message.kind === 'thinking')
+      .map((message) => (message.content || '').trim())
+      .filter(Boolean),
+  );
   const reconciledRealtimeMessages = removeOptimisticUserEchoes(serverMessages, realtimeMessages);
 
   return reconciledRealtimeMessages.filter((message) => {
     if (serverIds.has(message.id)) {
+      return false;
+    }
+
+    if (message.kind === 'thinking' && serverThoughts.has((message.content || '').trim())) {
       return false;
     }
 

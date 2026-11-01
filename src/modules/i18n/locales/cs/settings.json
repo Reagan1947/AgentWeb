@@ -782,7 +782,7 @@
     "fullScreen": "Celá obrazovka",
     "stopSession": "Zastavit relaci",
     "deleteSession": "Smazat relaci",
-    "sessions": "Relace",
+    "sessions": "Relace prohlížeče",
     "noSessions": "Žádné relace prohlížeče agentů.",
     "selected": "Vybraná relace",
     "statusLabel": "Stav",

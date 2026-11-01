@@ -31,6 +31,12 @@ export type LaunchedBrowser = {
   debugUrl: string | null;
   steelSessionId: string | null;
   steelBaseUrl: string | null;
+  /**
+   * True when the Steel server drives one shared Chrome (self-hosted Steel).
+   * Creating another session there replaces the running one, so the
+   * browser-use service must not open a second concurrent session on it.
+   */
+  steelExclusive: boolean;
 };
 
 type LaunchAgentBrowserInput = {
@@ -324,6 +330,7 @@ async function launchLocalBrowser(
       debugUrl: null,
       steelSessionId: null,
       steelBaseUrl: null,
+      steelExclusive: false,
     };
   }
 
@@ -338,6 +345,7 @@ async function launchLocalBrowser(
     debugUrl: null,
     steelSessionId: null,
     steelBaseUrl: null,
+    steelExclusive: false,
   };
 }
 
@@ -382,6 +390,9 @@ export async function launchAgentBrowser(input: LaunchAgentBrowserInput): Promis
         debugUrl,
         steelSessionId: steel.id,
         steelBaseUrl: input.steelBaseUrl,
+        // Steel Cloud puts the session id in the connect URL; self-hosted Steel
+        // returns the same bare websocket for every session.
+        steelExclusive: !steel.websocketUrl.includes(steel.id),
       };
     } catch (error) {
       if (createdId) {

@@ -112,9 +112,10 @@ router.post('/runtime/install', async (_req, res) => {
   }
 });
 
-router.get('/sessions', async (_req, res) => {
+router.get('/sessions', async (req, res) => {
   try {
-    res.json({ success: true, data: { sessions: await browserUseService.listSessions() } });
+    const compact = readParam(req.query.compact as string | string[] | undefined) === 'true';
+    res.json({ success: true, data: { sessions: await browserUseService.listSessions({ compact }) } });
   } catch (error) {
     sendError(
       res,

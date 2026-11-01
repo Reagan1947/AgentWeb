@@ -1,3 +1,5 @@
+import { statSync } from 'node:fs';
+
 import crossSpawn from 'cross-spawn';
 
 import {
@@ -26,6 +28,14 @@ const WORKSPACE_TRUST_PATTERNS = [
   /pass --trust,\s*--yolo,\s*or -f/i
 ];
 
+function isExistingDirectory(directoryPath) {
+  try {
+    return statSync(directoryPath).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
 function isWorkspaceTrustPrompt(text = '') {
   if (!text || typeof text !== 'string') {
     return false;
@@ -41,6 +51,15 @@ async function spawnCursor(command, options = {}, ws, context) {
   // would be swallowed and leave the returned promise pending forever.
   const providerSessionId = context.resolveProviderSessionId(options.sessionId);
   const resolvedModel = await context.resolveResumeModel(options.sessionId, options.model);
+
+  // spawn reports a missing cwd as the same ENOENT as a missing binary, which
+  // reads as "Cursor failed to start" when the project folder was moved.
+  const requestedCwd = options.cwd || options.projectPath;
+  if (requestedCwd && !isExistingDirectory(requestedCwd)) {
+    const message = `Project directory does not exist: ${requestedCwd}`;
+    ws.send(createNormalizedMessage({ kind: 'error', content: message, sessionId: options.sessionId || null, provider: 'cursor' }));
+    throw new Error(message);
+  }
 
   // `cursor-agent -p` denies every approval before a prompt exists. Keep that
   // path only when the user asked to skip approvals. Otherwise speak ACP so

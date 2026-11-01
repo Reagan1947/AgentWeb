@@ -122,7 +122,6 @@ export default function GitPanel({
     <div className="flex h-full flex-col bg-background">
       {!isMissingRepository && (
         <GitPanelHeader
-          isMobile={isMobile}
           currentBranch={currentBranch}
           branches={branches}
           remoteStatus={remoteStatus}

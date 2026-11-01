@@ -190,7 +190,7 @@ export default function Shell({
     [wsRef],
   );
 
-  // Null (not a label) when nothing is selected, which is what the header renders against.
+  // Truncated into the connect overlay when a session is open.
   const sessionDisplayName = useMemo(
     () => (selectedSession ? getSessionTitle(selectedSession) : null),
     [selectedSession],
@@ -298,12 +298,8 @@ export default function Shell({
         isConnected={isConnected}
         isInitialized={isInitialized}
         isRestarting={isRestarting}
-        hasSession={Boolean(selectedSession)}
-        sessionTitle={sessionDisplayName}
-        sessionProvider={selectedSession?.__provider ?? null}
         onDisconnect={handleDisconnectShell}
         onRestart={handleRestartShell}
-        statusNewSessionText={t('shell.status.newSession')}
         statusInitializingText={t('shell.status.initializing')}
         statusRestartingText={t('shell.status.restarting')}
         showThemeRestartHint={isClaudeThemeOutdated}
