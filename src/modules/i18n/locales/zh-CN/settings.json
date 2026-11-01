@@ -687,7 +687,7 @@
   },
   "browserUseSettings": {
     "sectionTitle": "浏览器",
-    "sectionDescription": "允许 Agent 打开一个你可以在 Browser 标签里观看的浏览器。Steel 在运行时，标签会嵌入它的实时画面；否则会话使用本机 Playwright 截图。",
+    "sectionDescription": "允许 Agent 打开一个你可以在 Browser 标签里观看的浏览器。请先安装并运行 Steel，标签才会嵌入实时画面；否则会话使用本机 Playwright 截图。",
     "enableLabel": "启用浏览器",
     "enableDescription": "为支持的 Agent 注册浏览器。Agent 可以创建会话，你可以查看、停止和删除它们。",
     "enableAriaLabel": "启用浏览器",
@@ -709,13 +709,13 @@
     "saveFailed": "保存浏览器设置失败",
     "installFailed": "安装浏览器运行时失败",
     "steelUrlLabel": "Steel 地址",
-    "steelUrlDescription": "留空则只用本机 Playwright。默认是这台机器上的 Steel 进程。命名配置档始终使用本机 Playwright。",
+    "steelUrlDescription": "请先安装 Steel，并在这台机器上运行。默认地址就是本机 Steel。留空则只用本机 Playwright。命名配置档始终使用本机 Playwright。",
     "steelUrlPlaceholder": "http://127.0.0.1:3000",
     "steelApiKeyLabel": "Steel API 密钥",
     "steelApiKeyDescription": "只有 Steel 云需要。本机 Steel 进程可以留空。",
     "steelSave": "保存 Steel 设置",
     "steelReachable": "Steel 可连接",
-    "steelUnreachable": "Steel 未运行",
+    "steelUnreachable": "请先安装 Steel",
     "steelAuthFailed": "Steel API 密钥被拒绝",
     "steelNotConfigured": "仅本机 Playwright"
   }

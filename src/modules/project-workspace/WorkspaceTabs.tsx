@@ -1,11 +1,12 @@
-import { MessageSquare, Terminal, Folder, GitBranch, ClipboardCheck, MonitorPlay, type LucideIcon } from 'lucide-react';
+import { MessageSquare, Terminal, Folder, GitBranch, ClipboardCheck, type LucideIcon } from 'lucide-react';
 import { Fragment } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { usePlugins, PluginIcon } from '@/modules/plugins';
+import browserIconSvg from '@/modules/project-workspace/browser-icon.svg?raw';
 import { Tooltip, Tabs, TabsList, TabsTrigger } from '@/shared/ui';
 import type { AppTab } from '@/shared/types';
-import { usePlugins, PluginIcon } from '@/modules/plugins';
 
 type WorkspaceTabsProps = {
   activeTab: AppTab;
@@ -14,12 +15,24 @@ type WorkspaceTabsProps = {
   shouldShowBrowserTab: boolean;
 };
 
-type BuiltInTab = {
+type TabIconProps = {
+  className?: string;
+};
+
+type StandardBuiltInTab = {
   kind: 'builtin';
-  id: AppTab;
+  id: Exclude<AppTab, 'browser'>;
   labelKey: string;
   icon: LucideIcon;
 };
+
+type BrowserBuiltInTab = {
+  kind: 'builtin';
+  id: 'browser';
+  labelKey: string;
+};
+
+type BuiltInTab = StandardBuiltInTab | BrowserBuiltInTab;
 
 type PluginTab = {
   kind: 'plugin';
@@ -38,11 +51,26 @@ const BASE_TABS: BuiltInTab[] = [
   { kind: 'builtin', id: 'git',   labelKey: 'tabs.git',   icon: GitBranch },
 ];
 
-const BROWSER_TAB: BuiltInTab = {
+// Renders the supplied Browser.svg artwork. currentColor lets the tab tint it; the path is left unchanged.
+function BrowserTabIcon({ className }: TabIconProps) {
+  const svgStart = browserIconSvg.indexOf('<svg');
+  const svg = browserIconSvg
+    .slice(svgStart)
+    .replace('<svg ', '<svg fill="currentColor" aria-hidden="true" ')
+    .replace(' width="200" height="200"', '');
+
+  return (
+    <span
+      className={`inline-flex ${className ?? ''} [&>svg]:h-full [&>svg]:w-full`}
+      dangerouslySetInnerHTML={{ __html: svg }}
+    />
+  );
+}
+
+const BROWSER_TAB: BrowserBuiltInTab = {
   kind: 'builtin',
   id: 'browser',
   labelKey: 'tabs.browser',
-  icon: MonitorPlay,
 };
 
 const TASKS_TAB: BuiltInTab = {
@@ -108,14 +136,16 @@ export default function WorkspaceTabs({
                   aria-label={displayLabel}
                   className="size-7 px-0"
                 >
-                  {tab.kind === 'builtin' ? (
-                    <tab.icon className="h-3.5 w-3.5 shrink-0" strokeWidth={isActive ? 2.2 : 1.8} />
-                  ) : (
+                  {tab.kind === 'plugin' ? (
                     <PluginIcon
                       pluginName={tab.pluginName}
                       iconFile={tab.iconFile}
                       className="flex h-3.5 w-3.5 shrink-0 items-center justify-center [&>svg]:h-full [&>svg]:w-full"
                     />
+                  ) : tab.id === 'browser' ? (
+                    <BrowserTabIcon className="h-3.5 w-3.5 shrink-0" />
+                  ) : (
+                    <tab.icon className="h-3.5 w-3.5 shrink-0" strokeWidth={isActive ? 2.2 : 1.8} />
                   )}
                 </TabsTrigger>
               </Tooltip>

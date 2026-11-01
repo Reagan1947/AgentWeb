@@ -606,7 +606,7 @@
   },
   "browserUseSettings": {
     "sectionTitle": "瀏覽器",
-    "sectionDescription": "允許 Agent 開啟一個你可以在 Browser 分頁裡觀看的瀏覽器。Steel 在執行時，分頁會嵌入它的即時畫面；否則工作階段使用本機 Playwright 截圖。",
+    "sectionDescription": "允許 Agent 開啟一個你可以在 Browser 分頁裡觀看的瀏覽器。請先安裝並執行 Steel，分頁才會嵌入即時畫面；否則工作階段使用本機 Playwright 截圖。",
     "enableLabel": "啟用瀏覽器",
     "enableDescription": "為支援的 Agent 註冊瀏覽器。Agent 可以建立工作階段，你可以查看、停止和刪除它們。",
     "enableAriaLabel": "啟用瀏覽器",
@@ -628,13 +628,13 @@
     "saveFailed": "儲存瀏覽器設定失敗",
     "installFailed": "安裝瀏覽器執行環境失敗",
     "steelUrlLabel": "Steel 位址",
-    "steelUrlDescription": "留空則只用本機 Playwright。預設是這台機器上的 Steel 行程。命名設定檔一律使用本機 Playwright。",
+    "steelUrlDescription": "請先安裝 Steel，並在這台機器上執行。預設位址就是本機 Steel。留空則只用本機 Playwright。命名設定檔一律使用本機 Playwright。",
     "steelUrlPlaceholder": "http://127.0.0.1:3000",
     "steelApiKeyLabel": "Steel API 金鑰",
     "steelApiKeyDescription": "只有 Steel 雲需要。本機 Steel 行程可以留空。",
     "steelSave": "儲存 Steel 設定",
     "steelReachable": "Steel 可連線",
-    "steelUnreachable": "Steel 未執行",
+    "steelUnreachable": "請先安裝 Steel",
     "steelAuthFailed": "Steel API 金鑰被拒絕",
     "steelNotConfigured": "僅本機 Playwright"
   }

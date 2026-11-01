@@ -217,19 +217,85 @@ function getPlaywright(): any | null {
   }
 }
 
-function getMcpCommand(): { command: string; args: string[] } {
-  const mcpScriptPath = path.join(__dirname, 'browser-use-mcp.js');
-  if (fs.existsSync(mcpScriptPath)) {
+type BrowserMcpCommandLayout = {
+  moduleDirectory: string;
+  nodePath: string;
+  tsxCliPath?: string | null;
+  cloudcliPath?: string | null;
+  fileExists?: (filePath: string) => boolean;
+};
+
+/**
+ * Resolves the process Agents should launch for Browser MCP.
+ * Used by browser-use registration and by the browser-use service tests.
+ * The command and every argument are absolute paths, because Agent CLIs do not
+ * inherit this server's shell PATH. A bare `cloudcli` command is only used when
+ * that executable can actually be found.
+ */
+export function resolveBrowserMcpCommand(layout: BrowserMcpCommandLayout): { command: string; args: string[] } {
+  const exists = layout.fileExists ?? fs.existsSync;
+  const compiledScriptPath = path.join(layout.moduleDirectory, 'browser-use-mcp.js');
+  if (exists(compiledScriptPath)) {
     return {
-      command: process.execPath,
-      args: [mcpScriptPath],
+      command: layout.nodePath,
+      args: [compiledScriptPath],
     };
   }
 
-  return {
-    command: 'cloudcli',
-    args: ['browser-use-mcp'],
-  };
+  const sourceScriptPath = path.join(layout.moduleDirectory, 'browser-use-mcp.ts');
+  if (layout.tsxCliPath && exists(sourceScriptPath)) {
+    return {
+      command: layout.nodePath,
+      args: [
+        layout.tsxCliPath,
+        '--tsconfig',
+        path.join(layout.moduleDirectory, '..', '..', 'tsconfig.json'),
+        sourceScriptPath,
+      ],
+    };
+  }
+
+  if (layout.cloudcliPath) {
+    return {
+      command: layout.cloudcliPath,
+      args: ['browser-use-mcp'],
+    };
+  }
+
+  throw new Error('Browser MCP could not be registered because neither the local server entry nor the cloudcli command is available.');
+}
+
+function resolveTsxCliPath(): string | null {
+  try {
+    const packageJsonPath = require.resolve('tsx/package.json');
+    const cliPath = path.join(path.dirname(packageJsonPath), 'dist', 'cli.mjs');
+    return fs.existsSync(cliPath) ? cliPath : null;
+  } catch {
+    return null;
+  }
+}
+
+function findExecutableOnPath(name: string): string | null {
+  const directories = (process.env.PATH || '').split(path.delimiter).filter(Boolean);
+  const extensions = process.platform === 'win32' ? ['.cmd', '.exe', ''] : [''];
+  for (const directory of directories) {
+    for (const extension of extensions) {
+      const candidate = path.join(directory, `${name}${extension}`);
+      if (fs.existsSync(candidate)) {
+        return candidate;
+      }
+    }
+  }
+  return null;
+}
+
+function getMcpCommand(): { command: string; args: string[] } {
+  return resolveBrowserMcpCommand({
+    moduleDirectory: __dirname,
+    nodePath: process.execPath,
+    tsxCliPath: resolveTsxCliPath(),
+    cloudcliPath: findExecutableOnPath('cloudcli'),
+  });
 }
 
 function getMcpApiUrl(): string {
@@ -563,6 +629,11 @@ export const browserUseService = {
         : current.steelApiKey,
     };
 
+    if (nextSettings.enabled) {
+      // Fail before persisting a setting the Agent cannot actually launch.
+      getMcpCommand();
+    }
+
     const next = writeSettings(nextSettings);
     if (next.enabled) {
       await this.registerAgentMcp();
@@ -594,6 +665,18 @@ export const browserUseService = {
       sessionCount: sessions.size,
       message: describeBrowserAvailability(settings, readiness, steel),
     };
+  },
+
+  /**
+   * Rewrites the managed Browser MCP entry when Browser is enabled.
+   * Used by server startup so a dev server does not keep the `cloudcli`
+   * command written before this process knew how to launch the local entry.
+   */
+  async syncAgentMcp() {
+    if (!readSettings().enabled) {
+      return null;
+    }
+    return this.registerAgentMcp();
   },
 
   async registerAgentMcp() {

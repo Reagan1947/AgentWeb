@@ -377,6 +377,12 @@ async function startServer() {
             startEnabledPluginServers().catch(err => {
                 console.error('[Plugins] Error during startup:', err.message);
             });
+
+            // Point Agent MCP configs at this process. A previously saved
+            // `cloudcli` command is not on PATH when the app runs from source.
+            browserUseService.syncAgentMcp().catch((err) => {
+                console.error('[Browser] Error registering Browser MCP:', getErrorMessage(err));
+            });
         });
 
         await closeSessionsWatcher();

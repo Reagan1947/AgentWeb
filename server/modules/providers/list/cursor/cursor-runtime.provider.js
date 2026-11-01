@@ -7,6 +7,11 @@ import {
 } from '@/shared/image-attachments.js';
 import { notifyRunFailed, notifyRunStopped } from '@/modules/notifications/index.js';
 import { createCompleteMessage, createNormalizedMessage, flattenPromptForWindowsShell, stripAnsiSequences } from '@/shared/utils.js';
+import {
+  cursorAcpPermissions,
+  cursorNeedsInteractiveApproval,
+  runCursorAcpSession,
+} from '@/modules/providers/list/cursor/cursor-acp-session.js';
 
 // cross-spawn resolves .cmd shims/PATHEXT on Windows and delegates to
 // child_process.spawn everywhere else.
@@ -36,6 +41,22 @@ async function spawnCursor(command, options = {}, ws, context) {
   // would be swallowed and leave the returned promise pending forever.
   const providerSessionId = context.resolveProviderSessionId(options.sessionId);
   const resolvedModel = await context.resolveResumeModel(options.sessionId, options.model);
+
+  // `cursor-agent -p` denies every approval before a prompt exists. Keep that
+  // path only when the user asked to skip approvals. Otherwise speak ACP so
+  // Shell and MCP calls show up on the permission banner.
+  if (cursorNeedsInteractiveApproval(options)) {
+    return runCursorAcpSession({
+      command,
+      options,
+      providerSessionId,
+      resolvedModel,
+      writer: ws,
+      processes: activeCursorProcesses,
+      spawnImpl: spawnFunction,
+      isInstalled: () => context.isProviderInstalled(),
+    });
+  }
 
   return new Promise((resolve, reject) => {
     const {
@@ -384,6 +405,7 @@ function getActiveCursorSessions() {
 export const cursorRuntime = {
   run: spawnCursor,
   abort: abortCursorSession,
+  permissions: cursorAcpPermissions,
 };
 
 export {
