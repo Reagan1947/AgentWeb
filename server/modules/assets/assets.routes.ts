@@ -26,8 +26,16 @@ const storage = multer.diskStorage({
   },
 });
 
+// Browsers put UTF-8 bytes in the multipart filename parameter and do not
+// declare a charset. Multer's default latin1 decoding turns names such as
+// "季度汇报.pptx" into mojibake before they are stored on the chat message.
+const multipartOptions = {
+  defParamCharset: 'utf8',
+};
+
 const upload = multer({
   storage,
+  ...multipartOptions,
   fileFilter: (req, file, cb) => {
     if (isAllowedImageMimeType(file.mimetype)) {
       cb(null, true);
@@ -43,6 +51,7 @@ const upload = multer({
 
 const attachmentUpload = multer({
   storage,
+  ...multipartOptions,
   limits: {
     fileSize: 10 * 1024 * 1024,
     files: 10,

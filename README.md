@@ -103,13 +103,48 @@ The Browser tab is where you follow the agent on the web. Each session shows its
 <p><sub>The floating window stays over the conversation, so the page stays visible while you chat.</sub></p>
 </div>
 
-Enable the browser in **Settings > Browser**. Without further setup, sessions run on local Playwright and the Browser tab shows screenshots. If Chromium dependencies are missing, run:
+Enable the browser in **Settings > Browser**. AgentWeb can run sessions two ways. Local Playwright shows screenshots in the Browser tab. [Steel](https://github.com/steel-dev/steel-browser) embeds a live page you can watch and interact with. Playwright stays installed either way: AgentWeb attaches to a Steel session through it. If the settings page says Playwright or Chromium is missing, click **Install Runtime** there. When Chromium's system libraries are missing, run:
 
 ```bash
 npx playwright install-deps chromium
 ```
 
-For a live, interactive view, install and run [Steel](https://github.com/steel-dev/steel-browser), then set its address in the same settings page (default `http://127.0.0.1:3000`). An API key is only needed for Steel Cloud.
+#### Connect Steel
+
+AgentWeb does not start Steel. Run Steel yourself, then save its address in AgentWeb.
+
+**1. Start Steel**
+
+Docker is the setup Steel documents for a local process:
+
+```bash
+docker run -p 3000:3000 -p 9223:9223 ghcr.io/steel-dev/steel-browser
+```
+
+Leave that process running. Steel's API is on port **3000**. AgentWeb uses **3001** in production and **5173** for the Vite dev server, so the two do not share a port. Open [http://127.0.0.1:3000/ui](http://127.0.0.1:3000/ui) to confirm Steel is up. That page is Steel's own UI. The session you care about shows up in AgentWeb's Browser tab.
+
+**2. Save the address in AgentWeb**
+
+Open **Settings > Browser** and:
+
+1. Turn on **Enable Browser**.
+2. Set **Steel address** to `http://127.0.0.1:3000` for the Docker command above. Another host is fine when it is an `http` or `https` URL. Keep the API key out of the URL, and do not add a `/v1` path — AgentWeb appends `/v1/sessions` itself.
+3. Leave **Steel API key** empty for this local process. Fill it in only when that Steel server requires a key.
+4. Click **Save Steel settings**.
+
+The status line should read **Steel address: Steel reachable**, and the browser status **ready**. AgentWeb's server calls that address to open the session, and the browser you use for AgentWeb loads the live view from the URL Steel returns. On the same machine, `http://127.0.0.1:3000` covers both. To watch from another device, set Steel's `DOMAIN` to a host that device can reach before you start it. The default is `localhost:3000`.
+
+**3. Open a page**
+
+Ask the agent to open a URL or walk through a flow. The Browser tab lists the session with **Browser: Steel** and shows the live page. Use that view, pop it into the floating window, or stop and delete the session from the same tab.
+
+A self-hosted Steel process runs one Chrome. A newer session takes over the live view. The earlier session stays in the list and keeps the last page it showed.
+
+When Steel is down and local Chromium is installed, the agent still gets a browser and the tab shows Playwright screenshots. A rejected API key stops the session: update the key, or clear **Steel address** and save again to use local Playwright only. A named browser profile also stays on local Playwright, because that profile is stored on this machine. Leave the profile unset when you want the Steel live view.
+
+#### Steel Cloud
+
+Create a key at [app.steel.dev](https://app.steel.dev). In the same settings fields, set **Steel address** to `https://api.steel.dev` and paste the key into **Steel API key**, then save. AgentWeb sends the key in the `steel-api-key` header.
 
 ## Plugins
 

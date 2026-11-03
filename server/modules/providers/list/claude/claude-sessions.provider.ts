@@ -28,6 +28,7 @@ import {
   readObjectRecord,
   sliceTailPage,
   stripAnsiSequences,
+  stripClaudeImageScaleNotes,
   truncateSubagentActivity,
 } from '@/shared/utils.js';
 import { sessionsDb } from '@/modules/database/index.js';
@@ -1394,7 +1395,10 @@ export class ClaudeSessionsProvider implements IProviderSessions {
               toolUseResult: truncateNestedOutput(raw.toolUseResult ?? raw.tool_use_result),
             }));
           } else if (part.type === 'text') {
-            const text = part.text || '';
+            // Drop the coordinate hint Claude stores beside an image. A part
+            // that is only that hint falls through to the image-only bubble
+            // below when the turn also carries image blocks.
+            const text = stripClaudeImageScaleNotes(part.text || '');
             const parsedFiles = parseFilesInputTag(text);
             if (
               (parsedFiles.text || parsedFiles.attachments.length > 0)
@@ -1422,7 +1426,7 @@ export class ClaudeSessionsProvider implements IProviderSessions {
         if (messages.length === 0) {
           const textParts = raw.message.content
             .filter((part: AnyRecord) => part.type === 'text')
-            .map((part: AnyRecord) => part.text)
+            .map((part: AnyRecord) => stripClaudeImageScaleNotes(part.text || ''))
             .filter(Boolean)
             .join('\n');
           if (textParts && !isInternalContent(textParts)) {
@@ -1454,7 +1458,9 @@ export class ClaudeSessionsProvider implements IProviderSessions {
           }));
         }
       } else if (typeof raw.message.content === 'string') {
-        const text = raw.message.content;
+        // A Read of an image is persisted as a user string that is only the
+        // scale note. Stripping it leaves nothing to show.
+        const text = stripClaudeImageScaleNotes(raw.message.content);
 
         /**
          * Claude stores compact summaries as synthetic "user" rows so the CLI

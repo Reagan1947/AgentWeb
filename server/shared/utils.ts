@@ -1301,6 +1301,49 @@ export function isClaudeNonTurnMessageRow(row: AnyRecord): boolean {
   return row.message != null && row.type !== 'user' && row.type !== 'assistant';
 }
 
+/**
+ * One line Claude writes when it shrinks an image before the model sees it.
+ * The numbers are the original pixel size, the size actually sent, and the
+ * factor that maps a coordinate in the sent image back to the original.
+ * A Read of a PNG persists this line as its own user turn, which is how it
+ * shows up in the chat as if the person typed it.
+ */
+const CLAUDE_IMAGE_SCALE_NOTE =
+  /^\[Image: original \d+x\d+, displayed at \d+x\d+\. Multiply coordinates by \d+(?:\.\d+)? to map to original image\.\]$/;
+
+/**
+ * Removes Claude's image scale notes from a user turn.
+ *
+ * Each matching line is dropped. A turn that is only those lines comes back
+ * empty, so callers that skip empty user text do not draw a bubble. Text
+ * around the notes is kept, including blank lines between the remaining
+ * lines. A string with no note is returned unchanged, whitespace included.
+ *
+ * Used by the Claude sessions provider when it builds chat messages, and by
+ * conversation search so the same note is not a searchable user message.
+ */
+export function stripClaudeImageScaleNotes(content: string): string {
+  if (!content.includes('[Image:')) {
+    return content;
+  }
+
+  let removed = false;
+  const kept: string[] = [];
+  for (const line of content.split('\n')) {
+    if (CLAUDE_IMAGE_SCALE_NOTE.test(line.trim())) {
+      removed = true;
+      continue;
+    }
+    kept.push(line);
+  }
+
+  if (!removed) {
+    return content;
+  }
+
+  return kept.join('\n').replace(/^\n+|\n+$/g, '');
+}
+
 // ---------------------------
 //----------------- CLI PROMPT ARGUMENT UTILITIES ------------
 /**

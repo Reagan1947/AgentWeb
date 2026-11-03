@@ -103,13 +103,48 @@ Browser 标签页用来跟着代理看它在网页上做了什么。每个会话
 <p><sub>悬浮窗留在对话上方，聊天的同时能看着页面。</sub></p>
 </div>
 
-在 **设置 > Browser** 中启用浏览器。无需额外配置时，会话使用本地 Playwright，Browser 标签页显示截图。如果缺少 Chromium 依赖，运行：
+在 **设置 > Browser** 中启用浏览器。会话有两种跑法。本地 Playwright 在 Browser 标签页里显示截图。[Steel](https://github.com/steel-dev/steel-browser) 则嵌入一个可以看着操作的实时页面。两种方式都要装好 Playwright：AgentWeb 通过它连上 Steel 会话。设置页提示缺少 Playwright 或 Chromium 时，点那里的 **安装运行时**。缺少 Chromium 的系统库时，运行：
 
 ```bash
 npx playwright install-deps chromium
 ```
 
-如需实时、可交互的画面，安装并运行 [Steel](https://github.com/steel-dev/steel-browser)，然后在同一设置页填写它的地址（默认 `http://127.0.0.1:3000`）。只有使用 Steel Cloud 时才需要 API key。
+#### 连接 Steel
+
+AgentWeb 不会自己启动 Steel。先在本机把 Steel 跑起来，再把它的地址保存到 AgentWeb。
+
+**1. 启动 Steel**
+
+Steel 文档里，本机进程用 Docker 启动：
+
+```bash
+docker run -p 3000:3000 -p 9223:9223 ghcr.io/steel-dev/steel-browser
+```
+
+让这个进程一直跑着。Steel 的 API 在 **3000** 端口。AgentWeb 生产模式用 **3001**，Vite 开发服务器用 **5173**，两边不抢同一个端口。打开 [http://127.0.0.1:3000/ui](http://127.0.0.1:3000/ui) 确认 Steel 已经起来。那个页面是 Steel 自己的界面。你要看的会话出现在 AgentWeb 的 Browser 标签页里。
+
+**2. 在 AgentWeb 里保存地址**
+
+打开 **设置 > Browser**，然后：
+
+1. 打开 **启用浏览器**。
+2. **Steel 地址**填 `http://127.0.0.1:3000`，对应上面的 Docker 命令。Steel 在别的机器上时，填那个 `http` 或 `https` 地址。密钥不要写进地址，也不要加上 `/v1` 路径。AgentWeb 会自己请求 `/v1/sessions`。
+3. 本机这个进程的 **Steel API 密钥**留空。只有 Steel 服务要求密钥时才填写。
+4. 点击 **保存 Steel 设置**。
+
+状态行应变成 **Steel 地址：Steel 可连接**，浏览器状态为 **就绪**。AgentWeb 的服务器用这个地址创建会话，你打开 AgentWeb 的浏览器再去加载 Steel 返回的实时画面。同一台机器上，`http://127.0.0.1:3000` 两边都够用。要从另一台设备看画面，启动 Steel 前把它的 `DOMAIN` 设成那台设备能访问的主机。默认值是 `localhost:3000`。
+
+**3. 打开页面**
+
+让代理打开一个网址，或走一遍页面流程。Browser 标签页会列出这个会话，**浏览器**显示为 **Steel**，页面是实时画面。可以在这个画面里操作，把它弹出成悬浮窗，或在同一标签页里停止并删除会话。
+
+自托管的 Steel 进程只跑一个 Chrome。新会话会接管实时画面。之前的会话还留在列表里，显示它最后打开的页面。
+
+Steel 没在运行、本机又装了 Chromium 时，代理仍然能用浏览器，标签页显示的是 Playwright 截图。API 密钥被拒绝时会话会停下来：改密钥，或清空 **Steel 地址**再保存，就只使用本地 Playwright。命名的浏览器配置档也走本地 Playwright，因为配置档存在这台机器上。要看 Steel 实时画面时，不要指定配置档。
+
+#### Steel Cloud
+
+在 [app.steel.dev](https://app.steel.dev) 创建密钥。同一组设置里，**Steel 地址**填 `https://api.steel.dev`，把密钥贴进 **Steel API 密钥**，然后保存。AgentWeb 会用 `steel-api-key` 请求头带上这个密钥。
 
 ## 插件
 
