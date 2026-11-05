@@ -1089,6 +1089,18 @@ export type WorkspacePathValidationResult = {
   error?: string;
 };
 
+/**
+ * Options for `validateWorkspacePath`.
+ *
+ * Project registration and folder creation omit these options and reject a
+ * directory that contains nono's protected credential paths. The File Tree
+ * browser passes `forBrowsing` so it can list that directory and let the user
+ * open a subdirectory that does not contain them.
+ */
+export type WorkspacePathValidationOptions = {
+  forBrowsing?: boolean;
+};
+
 // ---------------------------
 //----------------- GIT COMMAND EXECUTION AND WORKTREE MANAGEMENT ------------
 /**
@@ -1445,11 +1457,16 @@ export type FileTreeProjectGateway = {
  * Workspace validation boundary used by filesystem browsing and folder creation.
  *
  * The injected validator enforces the configured workspace root and resolves
- * symlinks before the File Tree service exposes or mutates paths.
+ * symlinks before the File Tree service exposes or mutates paths. Browsing
+ * passes `forBrowsing` so a parent such as the home directory can be listed;
+ * folder creation calls it without that option and still rejects the parent.
  */
 export type FileTreeWorkspaceGateway = {
   rootPath: string;
-  validatePath(candidatePath: string): Promise<WorkspacePathValidationResult>;
+  validatePath(
+    candidatePath: string,
+    options?: WorkspacePathValidationOptions,
+  ): Promise<WorkspacePathValidationResult>;
   /**
    * Resolves a path readable outside the workspace root — the system temp
    * directory and the Claude projects directory — or `null` when it is not

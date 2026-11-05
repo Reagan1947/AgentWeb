@@ -8,8 +8,8 @@ import SettingsRow from '@/modules/settings/SettingsRow';
 import SettingsSection from '@/modules/settings/SettingsSection';
 import SettingsToggle from '@/modules/settings/SettingsToggle';
 import { FolderBrowserModal } from '@/modules/project-creation-wizard';
-import { api, readApiJson } from '@/shared/api';
-import { Button, Input } from '@/shared/ui';
+import { ApiRequestError, api, readApiJson } from '@/shared/api';
+import { Button, InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@/shared/ui';
 
 type NonoSettings = {
   enabled: boolean;
@@ -23,9 +23,9 @@ export default function NonoSettingsTab() {
   const { t } = useTranslation('settings');
   // Server copy of the nono choice. Null until the first load so the switch does not flash off.
   const [settings, setSettings] = useState<NonoSettings | null>(null);
-  // Path typed into the add-folder field. Saved only when the user adds it.
+  // Path in the add-folder field, typed or filled by the folder browser. Saved only when the user adds it.
   const [folderDraft, setFolderDraft] = useState('');
-  // The folder browser sits above this dialog while the user picks an extra folder.
+  // The folder browser sits above this dialog while the user picks a path to write into the field.
   const [browserOpen, setBrowserOpen] = useState(false);
   // True until the first settings response settles.
   const [isLoading, setIsLoading] = useState(true);
@@ -82,7 +82,8 @@ export default function NonoSettingsTab() {
       });
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('nono.saveFailed'));
+      const blocked = err instanceof ApiRequestError && err.code === 'NONO_FOLDER_PARENT';
+      setError(blocked ? t('nono.folderBlocked') : (err instanceof Error ? err.message : t('nono.saveFailed')));
       return false;
     } finally {
       setIsSaving(false);
@@ -167,39 +168,43 @@ export default function NonoSettingsTab() {
       >
         <SettingsCard divided>
           <div className="space-y-3 px-4 py-4">
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <Input
-                value={folderDraft}
-                placeholder={t('nono.folderPlaceholder')}
-                disabled={isLoading || isSaving || !settings}
-                onChange={(event) => setFolderDraft(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') {
-                    event.preventDefault();
-                    void addFolder(folderDraft);
-                  }
-                }}
-              />
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={() => void addFolder(folderDraft)}
-                  disabled={isSaving || !settings || !folderDraft.trim()}
-                >
-                  {t('nono.addFolder')}
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setBrowserOpen(true)}
-                  disabled={isSaving || !settings}
-                >
-                  <FolderOpen className="h-4 w-4" />
-                  {t('nono.browseFolder')}
-                </Button>
-              </div>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <InputGroup
+                className="min-w-0 flex-1"
+                data-disabled={isLoading || isSaving || !settings ? true : undefined}
+              >
+                <InputGroupInput
+                  value={folderDraft}
+                  placeholder={t('nono.folderPlaceholder')}
+                  disabled={isLoading || isSaving || !settings}
+                  onChange={(event) => setFolderDraft(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      void addFolder(folderDraft);
+                    }
+                  }}
+                />
+                <InputGroupAddon align="inline-end">
+                  <InputGroupButton
+                    variant="secondary"
+                    aria-label={t('nono.browseFolder')}
+                    onClick={() => setBrowserOpen(true)}
+                    disabled={isSaving || !settings}
+                  >
+                    <FolderOpen />
+                    {t('nono.browseFolder')}
+                  </InputGroupButton>
+                </InputGroupAddon>
+              </InputGroup>
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => void addFolder(folderDraft)}
+                disabled={isSaving || !settings || !folderDraft.trim()}
+              >
+                {t('nono.addFolder')}
+              </Button>
             </div>
             {!settings || settings.allowedFolders.length === 0 ? (
               <p className="text-sm italic text-muted-foreground">
@@ -242,8 +247,9 @@ export default function NonoSettingsTab() {
         layerClassName="z-[10050]"
         onClose={() => setBrowserOpen(false)}
         onFolderSelected={(folderPath) => {
+          // The browser only fills the field. The folder is saved when the user clicks Add folder.
           setBrowserOpen(false);
-          void addFolder(folderPath);
+          setFolderDraft(folderPath);
         }}
       />
     </div>

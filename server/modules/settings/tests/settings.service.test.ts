@@ -3,6 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
+import { AppError, validateWorkspacePath } from '@/shared/utils.js';
 import { createSettingsService } from '../settings.service.js';
 
 type Dependencies = Parameters<typeof createSettingsService>[0];
@@ -184,4 +185,45 @@ test('nono settings store an enabled choice and canonical absolute folders', () 
   assert.equal(saved.available, true);
   assert.deepEqual(saved.allowedFolders, ['/tmp/nono-allow', homeFolder]);
   assert.deepEqual(service.getNonoSettings(1).allowedFolders, ['/tmp/nono-allow', homeFolder]);
+});
+
+test('nono settings reject the home directory and a stored home folder is dropped', () => {
+  let stored: unknown = {
+    enabled: true,
+    allowedFolders: [os.homedir(), '/tmp/nono-allow'],
+  };
+  const service = createSettingsService(dependencies({
+    nonoAvailable: () => true,
+    nonoSettings: {
+      read: () => stored,
+      save: (_userId, settings) => {
+        stored = settings;
+      },
+    },
+  }));
+  assert.deepEqual(service.getNonoSettings(1).allowedFolders, ['/tmp/nono-allow']);
+  assert.throws(
+    () => service.updateNonoSettings(1, { enabled: true, allowedFolders: [os.homedir()] }),
+    (error: unknown) => error instanceof AppError && error.code === 'NONO_FOLDER_PARENT',
+  );
+  assert.throws(
+    () => service.updateNonoSettings(1, { enabled: true, allowedFolders: [path.join(os.homedir(), '.config')] }),
+    (error: unknown) => error instanceof AppError && error.code === 'NONO_FOLDER_PARENT',
+  );
+});
+
+test('the home directory cannot be registered as a project', async () => {
+  const validation = await validateWorkspacePath(os.homedir());
+  assert.equal(validation.valid, false);
+});
+
+test('home can be browsed, and a subdirectory that does not contain credential paths can be a project', async () => {
+  const browsed = await validateWorkspacePath(os.homedir(), { forBrowsing: true });
+  assert.equal(browsed.valid, true);
+
+  const project = await validateWorkspacePath(path.join(os.homedir(), 'cloudcli-not-a-real-project'));
+  assert.equal(project.valid, true);
+
+  const configDirectory = await validateWorkspacePath(path.join(os.homedir(), '.config'));
+  assert.equal(configDirectory.valid, false);
 });

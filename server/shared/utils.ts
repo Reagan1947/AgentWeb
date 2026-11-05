@@ -32,6 +32,7 @@ import type {
   ProviderSkillSource,
   QueuedChatMessage,
   SubagentActivity,
+  WorkspacePathValidationOptions,
   WorkspacePathValidationResult,
 } from '@/shared/types.js';
 
@@ -387,9 +388,15 @@ export function normalizeProjectPath(inputPath: string): string {
  *
  * Call this before any filesystem mutation that creates or registers projects.
  * The function resolves symlinks, enforces `WORKSPACES_ROOT` containment, and
- * blocks known system directories.
+ * blocks known system directories. A directory that contains nono's protected
+ * credential paths cannot be registered as a project. The File Tree browser
+ * passes `forBrowsing` so it can still list that directory; the Projects module
+ * and folder creation do not.
  */
-export async function validateWorkspacePath(requestedPath: string): Promise<WorkspacePathValidationResult> {
+export async function validateWorkspacePath(
+  requestedPath: string,
+  options: WorkspacePathValidationOptions = {},
+): Promise<WorkspacePathValidationResult> {
   try {
     const normalizedRequestedPath = normalizeProjectPath(requestedPath);
     if (!normalizedRequestedPath) {
@@ -485,6 +492,13 @@ export async function validateWorkspacePath(requestedPath: string): Promise<Work
       if (fileError.code !== 'ENOENT') {
         throw fileError;
       }
+    }
+
+    if (!options.forBrowsing && nonoFolderOverlapsProtectedPath(resolvedPath)) {
+      return {
+        valid: false,
+        error: 'This folder contains protected credential paths and cannot be a project. Choose a subdirectory that does not include them.',
+      };
     }
 
     return {
@@ -1550,6 +1564,56 @@ export function findApplicationRoot(startDirectory: string): string {
 // ---------------------------
 //----------------- NONO SETTINGS ------------
 
+/**
+ * Credential paths nono always denies under the home directory.
+ *
+ * Linux cannot allow a parent of one of these and still enforce the deny, so
+ * neither a project nor an extra nono folder may be one of these paths or a
+ * directory that contains one. The list matches nono's default deny groups.
+ * Settings and workspace validation both use it.
+ */
+const NONO_PROTECTED_RELATIVE_PATHS = [
+  '.1password', '.aws', '.azure', '.bash_history', '.bash_login', '.bash_logout',
+  '.bash_profile', '.bashrc', '.bunfig.toml', '.config/BraveSoftware',
+  '.config/bun/bunfig.toml', '.config/chromium', '.config/fish', '.config/gcloud',
+  '.config/google-chrome', '.config/microsoft-edge', '.config/op', '.config/opera',
+  '.config/vivaldi', '.credentials', '.docker', '.env', '.envrc', '.gcloud',
+  '.git-credentials', '.gnupg', '.history', '.keys', '.kube', '.local/share/keyrings',
+  '.local/state/nono', '.mozilla/firefox', '.netrc', '.npmrc', '.op', '.password-store',
+  '.pki', '.profile', '.python_history', '.secrets', '.ssh', '.terraform.d',
+  '.vault-token', '.zlogin', '.zlogout', '.zprofile', '.zsh_history', '.zshenv', '.zshrc',
+];
+
+function isSameOrDescendantPath(parent: string, candidate: string): boolean {
+  const relative = path.relative(parent, candidate);
+  return relative === '' || (
+    relative !== '..'
+    && !relative.startsWith(`..${path.sep}`)
+    && !path.isAbsolute(relative)
+  );
+}
+
+/**
+ * True when `folder` is a nono protected path, sits inside one, or contains one.
+ *
+ * Granting that folder makes Linux refuse to start the sandbox. The home
+ * directory itself contains the protected paths, so it is included. A project
+ * subdirectory such as `~/work/AgentWeb` is not. Settings rejects these folders,
+ * workspace registration rejects them as projects, and the Claude broker omits
+ * them from the nono allow list.
+ */
+export function nonoFolderOverlapsProtectedPath(folder: string): boolean {
+  const resolved = path.resolve(folder);
+  const home = path.resolve(os.homedir());
+  const stateHome = process.env.XDG_STATE_HOME || path.join(home, '.local', 'state');
+  const protectedPaths = [
+    ...NONO_PROTECTED_RELATIVE_PATHS.map((entry) => path.resolve(home, entry)),
+    path.resolve(stateHome, 'nono'),
+  ];
+  return protectedPaths.some((protectedPath) =>
+    isSameOrDescendantPath(resolved, protectedPath) || isSameOrDescendantPath(protectedPath, resolved));
+}
+
 /** Preference key for `NonoSettings`. Settings persists it and the Claude broker reads it back. */
 export const NONO_SETTINGS_PREFERENCE_KEY = 'nonoSettings';
 
@@ -1625,7 +1689,7 @@ export function readNonoSettings(value: unknown): NonoSettings {
         continue;
       }
       const normalized = normalizeNonoAllowedFolder(folder);
-      if (!normalized || allowedFolders.includes(normalized)) {
+      if (!normalized || allowedFolders.includes(normalized) || nonoFolderOverlapsProtectedPath(normalized)) {
         continue;
       }
       allowedFolders.push(normalized);
@@ -1679,6 +1743,12 @@ export function parseNonoSettingsUpdate(input: unknown): NonoSettings {
     if (!normalized) {
       throw new AppError('Accessible folders must be absolute paths, not the filesystem root', {
         code: 'NONO_FOLDER_INVALID',
+        statusCode: 400,
+      });
+    }
+    if (nonoFolderOverlapsProtectedPath(normalized)) {
+      throw new AppError('This folder contains protected credential paths. Home and folders such as .config or .local cannot be granted.', {
+        code: 'NONO_FOLDER_PARENT',
         statusCode: 400,
       });
     }

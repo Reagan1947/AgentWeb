@@ -1112,6 +1112,7 @@ async function queryClaudeSDK(
       try {
         const broker = applyClaudeNonoBroker({
           userId: brokerUserId,
+          cwd: options.cwd,
           claudeExecutable: typeof sdkOptions.pathToClaudeCodeExecutable === 'string'
             ? sdkOptions.pathToClaudeCodeExecutable
             : undefined,

@@ -429,7 +429,7 @@ function createRealFileSystemService(projectRoot: string, workspaceRoot = projec
     projects: { getProjectPathById: async () => projectRoot },
     workspace: {
       rootPath: workspaceRoot,
-      validatePath: (candidatePath) => validateWorkspacePath(candidatePath),
+      validatePath: (candidatePath, options) => validateWorkspacePath(candidatePath, options),
       resolveReadOnlyRootPath: (candidatePath) => resolveReadOnlyRootPath(candidatePath),
     },
     resolveMimeType: () => 'text/plain',
@@ -437,6 +437,19 @@ function createRealFileSystemService(projectRoot: string, workspaceRoot = projec
     logger: { error: () => undefined },
   });
 }
+
+test('home can be listed by the folder browser, but a credential path still cannot be created', async () => {
+  const home = os.homedir();
+  const service = createRealFileSystemService(home, home);
+
+  const browsed = await service.browseWorkspace('~');
+  assert.equal(browsed.path, await fsPromises.realpath(home));
+
+  await assert.rejects(
+    service.createWorkspaceFolder(path.join(home, '.ssh', 'should-not-create')),
+    (error: unknown) => (error as AppError).code === 'INVALID_WORKSPACE_PATH',
+  );
+});
 
 test('the temp directory can be browsed and read, but never written to', async () => {
   const temporaryDirectory = await fsPromises.mkdtemp(path.join(os.tmpdir(), 'file-tree-tmp-'));

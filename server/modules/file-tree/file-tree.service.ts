@@ -332,7 +332,9 @@ export function createFileTreeService(dependencies: FileTreeServiceDependencies)
       return readOnlyPath;
     }
 
-    const validation = await dependencies.workspace.validatePath(targetPath);
+    // Listing is not a grant. Home contains credential paths and cannot be a
+    // project, but the browser has to open it so a subdirectory can be chosen.
+    const validation = await dependencies.workspace.validatePath(targetPath, { forBrowsing: true });
     if (!validation.valid) {
       throw createFileTreeError(validation.error ?? 'Path is outside the workspace root', 403, 'INVALID_WORKSPACE_PATH');
     }

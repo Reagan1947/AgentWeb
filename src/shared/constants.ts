@@ -115,7 +115,7 @@ export const SETTINGS_MAIN_TABS: SettingsMainTabMeta[] = [
   { id: 'commands', label: 'Commands', keywords: 'commands slash skills builtins', icon: Terminal },
   { id: 'git', label: 'Git', keywords: 'git github commits', icon: GitBranch },
   { id: 'api', label: 'API Tokens', keywords: 'api tokens auth keys', icon: KeyRound },
-  { id: 'nono', label: 'nono', keywords: 'nono sandbox vault folders secrets', icon: Shield },
+  { id: 'nono', label: 'Nono', keywords: 'nono sandbox vault folders secrets', icon: Shield },
   { id: 'tasks', label: 'Tasks', keywords: 'tasks taskmaster', icon: ListChecks },
   { id: 'browser', label: 'Browser', keywords: 'browser playwright chromium automation', icon: MonitorPlay },
   { id: 'notifications', label: 'Notifications', keywords: 'notifications alerts push', icon: Bell },

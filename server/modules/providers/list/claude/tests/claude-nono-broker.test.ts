@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import os from 'node:os';
 import test from 'node:test';
 
 import { buildBrokeredNonoProfile } from '@/modules/providers/list/claude/claude-nono-broker.js';
@@ -50,4 +51,14 @@ test('brokered nono profile grants the configured folders and still omits secret
   const profile = built.profile as { filesystem: { allow: string[] } };
   assert.deepEqual(profile.filesystem.allow, ['$HOME/.claude', '/tmp/cloudcli-claude', '/srv/notes']);
   assert.equal(JSON.stringify(built.profile).includes('super-secret'), false);
+});
+
+test('brokered nono profile leaves out the home directory', () => {
+  const built = buildBrokeredNonoProfile({
+    credentials: [],
+    claudeTempDir: '/tmp/cloudcli-claude',
+    allowedFolders: [os.homedir(), '/srv/notes'],
+  });
+  const profile = built.profile as { filesystem: { allow: string[] } };
+  assert.deepEqual(profile.filesystem.allow, ['$HOME/.claude', '/tmp/cloudcli-claude', '/srv/notes']);
 });

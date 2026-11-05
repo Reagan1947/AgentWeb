@@ -8,7 +8,9 @@ import { Textarea } from '@/shared/ui/textarea'
 
 /**
  * shadcn/ui InputGroup. The chat composer's prompt field uses it as the
- * visual shell around the textarea, attachment row and toolbar.
+ * visual shell around the textarea, attachment row and toolbar. The project
+ * creation wizard and Nono settings use it so a folder browser button sits
+ * inside a path field.
  */
 const InputGroup = React.forwardRef<HTMLDivElement, React.ComponentProps<'div'>>(
   ({ className, ...props }, ref) => {
@@ -62,7 +64,7 @@ const inputGroupAddonVariants = cva(
 
 type InputGroupAddonProps = React.ComponentProps<'div'> & VariantProps<typeof inputGroupAddonVariants>
 
-/** shadcn/ui InputGroupAddon. The chat composer uses it for the attachment row and the toolbar. */
+/** shadcn/ui InputGroupAddon. The chat composer uses it for the attachment row and the toolbar. The project creation wizard and Nono settings use it to hold the folder browser button. */
 const InputGroupAddon = React.forwardRef<HTMLDivElement, InputGroupAddonProps>(
   ({ className, align = 'inline-start', onClick, ...props }, ref) => {
     return (
@@ -109,7 +111,7 @@ const inputGroupButtonVariants = cva('flex items-center gap-2 text-sm shadow-non
 type InputGroupButtonProps = Omit<React.ComponentProps<typeof Button>, 'size'> &
   VariantProps<typeof inputGroupButtonVariants>
 
-/** shadcn/ui InputGroupButton. The chat composer's footer icon buttons use it. */
+/** shadcn/ui InputGroupButton. The chat composer's footer icon buttons use it. The project creation wizard and Nono settings use it for the folder browser inside a path field. */
 const InputGroupButton = React.forwardRef<HTMLButtonElement, InputGroupButtonProps>(
   ({ className, type = 'button', variant = 'ghost', size = 'xs', ...props }, ref) => {
     return (
@@ -143,7 +145,7 @@ const InputGroupText = React.forwardRef<HTMLSpanElement, React.ComponentProps<'s
 )
 InputGroupText.displayName = 'InputGroupText'
 
-/** shadcn/ui InputGroupInput. The borderless control inside an InputGroup. */
+/** shadcn/ui InputGroupInput. The borderless control inside an InputGroup. The project creation wizard and Nono settings use it for a path field. */
 const InputGroupInput = React.forwardRef<HTMLInputElement, React.ComponentProps<'input'>>(
   ({ className, ...props }, ref) => {
     return (
@@ -151,7 +153,7 @@ const InputGroupInput = React.forwardRef<HTMLInputElement, React.ComponentProps<
         ref={ref}
         data-slot="input-group-control"
         className={cn(
-          'flex-1 rounded-none border-0 bg-transparent shadow-none focus-visible:ring-0 dark:bg-transparent',
+          'h-9 flex-1 rounded-none border-0 bg-transparent py-1 shadow-none focus-visible:ring-0 dark:bg-transparent',
           className
         )}
         {...props}

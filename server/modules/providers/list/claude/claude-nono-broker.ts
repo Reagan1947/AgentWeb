@@ -5,6 +5,9 @@
  * upstream) are placed only in the environment of a nono parent. Claude is the
  * sandboxed child and receives phantom tokens plus localhost base URLs.
  * Extra folders from the nono settings tab are added to the filesystem allow list.
+ * Folders that contain nono's protected credential paths are left out, because
+ * Linux cannot allow a parent of those paths. The open project is granted with
+ * --allow-cwd, so that project must be a subdirectory rather than the home directory.
  * The prompt names every variable and never includes a stored secret.
  */
 
@@ -22,6 +25,7 @@ import {
 } from '@/modules/providers/shared/agent-vault.js';
 import {
   findExecutableOnPath,
+  nonoFolderOverlapsProtectedPath,
   NONO_SETTINGS_PREFERENCE_KEY,
   readNonoSettings,
 } from '@/shared/utils.js';
@@ -76,7 +80,8 @@ export function buildBrokeredNonoProfile(input: {
     credentialFormat: credential.credentialFormat,
     secret: '',
   })));
-  const allowedFolders = (input.allowedFolders ?? []).filter((folder) => folder && !folder.includes('\0'));
+  const allowedFolders = (input.allowedFolders ?? []).filter((folder) =>
+    folder && !folder.includes('\0') && !nonoFolderOverlapsProtectedPath(folder));
   return {
     profile: {
       meta: { name: 'agentweb-broker', version: '1.0.0' },
@@ -111,6 +116,10 @@ import process from 'node:process';
 const nono = process.env.CLOUDCLI_NONO_BIN;
 const profile = process.env.CLOUDCLI_NONO_PROFILE;
 const claude = process.env.CLOUDCLI_CLAUDE_BIN;
+if (process.env.CLOUDCLI_NONO_PROJECT_BLOCKED === '1') {
+  process.stderr.write('This project folder contains protected credential paths, so nono cannot allow it. Open a subdirectory instead.\\n');
+  process.exit(1);
+}
 if (!nono || !profile || !claude) {
   process.stderr.write('CloudCLI nono broker is not configured\\n');
   process.exit(1);
@@ -168,6 +177,7 @@ function loadUserNonoSettings(userId: number): NonoSettings {
 export function applyClaudeNonoBroker(input: {
   userId: number;
   claudeExecutable: string | undefined;
+  cwd?: string;
 }): { executablePath?: string; env: NodeJS.ProcessEnv; promptAppend: string } | null {
   const settings = loadUserNonoSettings(input.userId);
   const secrets = loadAgentVaultSecrets(input.userId);
@@ -235,6 +245,7 @@ export function applyClaudeNonoBroker(input: {
       CLOUDCLI_NONO_BIN: nonoPath,
       CLOUDCLI_NONO_PROFILE: paths.profilePath,
       CLOUDCLI_CLAUDE_BIN: claudeExecutable,
+      ...(input.cwd && nonoFolderOverlapsProtectedPath(input.cwd) ? { CLOUDCLI_NONO_PROJECT_BLOCKED: '1' } : {}),
       CLAUDE_CODE_TMPDIR: paths.tempDir,
     },
   };
