@@ -10,7 +10,7 @@ type AgentIconProps = {
 export function AgentIcon({ className }: AgentIconProps) {
   return (
     <svg
-      viewBox="0 0 1024 1024"
+      viewBox="120 92 800 800"
       width="24"
       height="24"
       fill="currentColor"

@@ -183,13 +183,11 @@ export default function NonoSettingsTab() {
                 />
                 <InputGroupAddon align="inline-end">
                   <InputGroupButton
-                    size="icon-xs"
-                    aria-label={t('nono.browseFolder')}
-                    title={t('nono.browseFolder')}
                     onClick={() => setBrowserOpen(true)}
                     disabled={isSaving || !settings}
                   >
                     <FolderOpen className="size-4" />
+                    {t('nono.browseFolder')}
                   </InputGroupButton>
                 </InputGroupAddon>
               </InputGroup>
