@@ -5,6 +5,7 @@ services:
       context: .
       args:
         AGENT_UID: ${AGENT_UID:-1000}
+        OPTIONAL_TOOLS: ${OPTIONAL_TOOLS:-}
     restart: unless-stopped
     env_file:
       - path: .env

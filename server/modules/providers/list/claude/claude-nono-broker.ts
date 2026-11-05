@@ -38,6 +38,18 @@ import type { NonoSettings } from '@/shared/types.js';
 const WRAPPER_NAME = 'claude-broker.mjs';
 const PREFLIGHT_TIMEOUT_MS = 15_000;
 const PREFLIGHT_ERROR_LENGTH = 800;
+/** Package manager caches under the home directory. npm, pnpm, pip, Go, and Maven fail without them. */
+const DEV_TOOL_CACHE_FOLDERS = [
+  '.npm',
+  '.cache',
+  '.bun',
+  '.local/share/pnpm',
+  '.local/state/pnpm',
+  '.local/share/uv',
+  'go',
+  '.m2',
+  '.gradle',
+];
 
 const execFileAsync = promisify(execFile);
 
@@ -100,7 +112,7 @@ export function buildBrokeredNonoProfile(input: {
       workdir: { access: 'readwrite' },
       groups: {
         // Skipped on platforms they do not apply to. nono adds its deny groups by itself.
-        include: ['claude_code_linux', 'claude_cache_linux', 'node_runtime', 'mise_manager', 'git_config'],
+        include: ['claude_code_linux', 'claude_cache_linux', 'node_runtime', 'mise_manager', 'git_config', 'linux_temp_read'],
       },
       filesystem: {
         allow: [...new Set(['$HOME/.claude', input.claudeTempDir, ...allowedFolders])],
@@ -197,6 +209,30 @@ export function resolveWorktreeGitDir(projectPath: string): string | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * Absolute folders from a colon-separated environment variable. Anything else is ignored.
+ * Used by the Claude broker for AGENTWEB_NONO_READ_PATHS and AGENTWEB_NONO_ALLOW_PATHS,
+ * which a deployment sets to grant tools it has installed.
+ */
+export function parseNonoPathList(value: string | undefined): string[] {
+  return (value ?? '')
+    .split(':')
+    .map((entry) => entry.trim())
+    .filter((entry) => path.isAbsolute(entry) && !isNonoFolderCoveringHome(entry));
+}
+
+/** Folders tools write to. nono ignores a grant whose path is missing, so each one is created first. */
+function ensureToolWriteFolders(): string[] {
+  const folders = [
+    ...DEV_TOOL_CACHE_FOLDERS.map((folder) => path.join(os.homedir(), folder)),
+    ...parseNonoPathList(process.env.AGENTWEB_NONO_ALLOW_PATHS),
+  ];
+  for (const folder of folders) {
+    fs.mkdirSync(folder, { recursive: true });
+  }
+  return folders;
 }
 
 /** Nearest folder above this module that holds package.json. The browser MCP entry lives under it. */
@@ -323,10 +359,14 @@ export async function applyClaudeNonoBroker(input: {
     claudeTempDir: paths.tempDir,
     allowedFolders: [
       ...settings.allowedFolders,
+      ...ensureToolWriteFolders(),
       ...[resolveWorktreeGitDir(projectPath)].filter((folder): folder is string => Boolean(folder)),
     ],
-    readFolders: [findAppRoot(), path.dirname(path.dirname(process.execPath))]
-      .filter((folder) => !isNonoFolderCoveringHome(folder)),
+    readFolders: [
+      ...[findAppRoot(), path.dirname(path.dirname(process.execPath))]
+        .filter((folder) => !isNonoFolderCoveringHome(folder)),
+      ...parseNonoPathList(process.env.AGENTWEB_NONO_READ_PATHS),
+    ],
     serverPort: Number.parseInt(process.env.SERVER_PORT || process.env.PORT || '3001', 10),
   });
   const serialized = JSON.stringify(built.profile);

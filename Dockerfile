@@ -14,6 +14,7 @@ FROM node:22-bookworm-slim
 ARG NONO_VERSION=0.81.0
 ARG CLAUDE_CODE_VERSION=latest
 ARG AGENT_UID=1000
+ARG OPTIONAL_TOOLS=
 ARG TARGETARCH
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
@@ -27,6 +28,8 @@ RUN set -e; arch="${TARGETARCH:-$(dpkg --print-architecture)}"; cd /tmp; \
   grep " $deb\$" SHA256SUMS.txt | sha256sum -c -; \
   apt-get install -y "./$deb"; rm -f "$deb" SHA256SUMS.txt; nono --version
 RUN npm install -g --no-audit --no-fund "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"
+COPY docker/extra-tools.sh /tmp/extra-tools.sh
+RUN bash /tmp/extra-tools.sh "$OPTIONAL_TOOLS" && rm -f /tmp/extra-tools.sh
 # The node image already owns UID 1000 as `node`, so reuse or create the account.
 RUN if ! getent passwd "$AGENT_UID" >/dev/null; then useradd -m -u "$AGENT_UID" -s /bin/bash agent; \
     else usermod -l agent -d /home/agent -m "$(getent passwd "$AGENT_UID" | cut -d: -f1)"; fi \
@@ -35,6 +38,9 @@ COPY --from=build --chown=agent /app /app
 USER agent
 WORKDIR /app
 ENV NODE_ENV=production HOST=0.0.0.0 SERVER_PORT=3001 WORKSPACES_ROOT=/workspace
+ENV JAVA_HOME=/usr/lib/jvm/jdk-default JDK8_HOME=/usr/lib/jvm/jdk-8 JDK17_HOME=/usr/lib/jvm/jdk-17
+# Installed files nono must also allow. Maven and Python venv read /usr/share, MEGAcmd lives in /opt and keeps its data in ~/.megaCmd.
+ENV AGENTWEB_NONO_READ_PATHS=/usr/share:/etc/maven:/opt/megacmd AGENTWEB_NONO_ALLOW_PATHS=/home/agent/.megaCmd
 EXPOSE 3001
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s \
   CMD curl -fsS "http://127.0.0.1:${SERVER_PORT}/health" || exit 1

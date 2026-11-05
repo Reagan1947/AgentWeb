@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
-import { buildBrokeredNonoProfile, resolveWorktreeGitDir } from '@/modules/providers/list/claude/claude-nono-broker.js';
+import { buildBrokeredNonoProfile, parseNonoPathList, resolveWorktreeGitDir } from '@/modules/providers/list/claude/claude-nono-broker.js';
 
 test('brokered nono profile names env vars and omits the secret', () => {
   const secret = 'super-secret-value';
@@ -101,4 +101,12 @@ test('resolveWorktreeGitDir finds the shared .git only for a linked worktree', (
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
+});
+
+test('parseNonoPathList keeps absolute paths and drops relative ones and the home directory', () => {
+  assert.deepEqual(parseNonoPathList(undefined), []);
+  assert.deepEqual(
+    parseNonoPathList(`/opt/megacmd: relative/path ::${os.homedir()}:/srv/tool`),
+    ['/opt/megacmd', '/srv/tool'],
+  );
 });

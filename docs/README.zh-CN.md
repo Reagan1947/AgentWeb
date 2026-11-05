@@ -99,6 +99,9 @@ docker compose up -d --build
 | `AGENTWEB_PORT` | `3001` | 网页界面在宿主机上的端口。 |
 | `WORKSPACE_DIR` | `./workspace` | 挂载到 `/workspace` 的宿主机文件夹，项目放在这里。 |
 | `AGENT_UID` | `1000` | 容器用户的 ID，需要对 `WORKSPACE_DIR` 有写权限。 |
+| `OPTIONAL_TOOLS` | 空 | 构建进镜像的额外工具：`jdk8`、`jdk17`。 |
+
+镜像预装了常用开发工具，因为代理自己无法安装系统软件：`gh`、`pnpm`、`bun`、`uv`、Python 的 `pip` 和 `venv`、Go、数据库客户端和 MEGAcmd。要加入 JDK 8 或 17（附带 Maven），在 `.env` 里设置 `OPTIONAL_TOOLS=jdk8,jdk17`。此时默认使用 JDK 17，把 `JAVA_HOME` 指向 `$JDK8_HOME` 即可切换。要加其他工具，修改 `docker/extra-tools.sh`。改完都需要重新构建。
 
 Steel 和 AgentWeb 容器共用网络，所以它的 Chrome 能打开代理启动的开发服务。代理不能占用 3000 和 9223 端口。账号、Claude 登录状态和设置都保存在 `agent-home` 卷里。
 
@@ -177,7 +180,7 @@ Steel 没在运行、本机又装了 Chromium 时，代理仍然能用浏览器�
 [nono](https://github.com/always-further/nono) 让 Claude 运行在内核强制的沙箱里，并把接口秘密留在服务器上。先在服务器上安装 nono（Docker 镜像已自带），再到 **设置 > nono** 中启用。
 
 - **只作用于 Claude 会话。** Shell 标签页、文件树和其他代理不受限制。
-- **Claude 能访问什么。** 当前项目、它自己的配置，以及你添加的文件夹。Git worktree 还会自动获得共享的 `.git`。文件夹改动对新会话生效。
+- **Claude 能访问什么。** 当前项目、它自己的配置、`~/.npm` 和 `~/.m2` 等包管理器缓存，以及你添加的文件夹。Git worktree 还会自动获得共享的 `.git`。文件夹改动对新会话生效。
 - **不能添加的文件夹。** 文件系统根目录、主目录和包含主目录的文件夹。在 Linux 上，nono 无法保护已授权目录下的 `~/.ssh` 等路径，所以会拒绝这样的策略。把主目录作为项目打开时也会因此被拒绝。
 - **不会静默降级。** 启用 nono 后，如果 nono 缺失或拒绝策略，Claude 不会启动，对话里会显示原因。修复问题或关闭 nono 即可。
 
