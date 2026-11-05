@@ -78,6 +78,32 @@ npm run desktop:dist:mac   # 构建 macOS .dmg
 npm run desktop:dist:win   # 构建 Windows 安装包
 ```
 
+### Docker
+
+在一台 Linux 机器上同时运行 AgentWeb、nono、Claude CLI 和 Steel。需要 Docker 和 Compose 2.24 或更高版本，内核要启用 Landlock（nono 的网络规则需要 6.7 或更高）。
+
+```bash
+git clone https://github.com/Reagan1947/AgentWeb.git
+cd AgentWeb
+cp .env.docker.example .env
+mkdir -p workspace
+docker compose up -d --build
+```
+
+打开 `http://localhost:3001`，首次访问时设置密码。登录 Claude 有两种方式：在 `.env` 里设置 `ANTHROPIC_API_KEY`，或在 Shell 标签页运行 `claude login`。然后在 **设置 > nono** 中启用 nono，在 **设置 > Browser** 中启用浏览器。默认的 Steel 地址可以直接使用。
+
+| `.env` 变量 | 默认值 | 用途 |
+|---|---|---|
+| `BIND_ADDRESS` | `127.0.0.1` | 发布端口监听的网卡。要从其他机器访问时填 `0.0.0.0`。 |
+| `PUBLIC_HOST` | `localhost` | 浏览器访问这台机器用的主机名。Steel 的实时画面从这里加载。 |
+| `AGENTWEB_PORT` | `3001` | 网页界面在宿主机上的端口。 |
+| `WORKSPACE_DIR` | `./workspace` | 挂载到 `/workspace` 的宿主机文件夹，项目放在这里。 |
+| `AGENT_UID` | `1000` | 容器用户的 ID，需要对 `WORKSPACE_DIR` 有写权限。 |
+
+Steel 和 AgentWeb 容器共用网络，所以它的 Chrome 能打开代理启动的开发服务。代理不能占用 3000 和 9223 端口。账号、Claude 登录状态和设置都保存在 `agent-home` 卷里。
+
+3000 和 9223 端口本身没有登录校验，能访问到它们的人就能操作浏览器。在有公网地址的机器上设置 `BIND_ADDRESS=0.0.0.0` 前，请先考虑这一点。
+
 ## 配置
 
 `.env` 中的常用配置：
@@ -111,7 +137,7 @@ npx playwright install-deps chromium
 
 #### 连接 Steel
 
-AgentWeb 不会自己启动 Steel。先在本机把 Steel 跑起来，再把它的地址保存到 AgentWeb。
+[Docker 部署](#docker)会自动启动 Steel。其他情况下 AgentWeb 不会自己启动 Steel：先在本机把 Steel 跑起来，再把它的地址保存到 AgentWeb。
 
 **1. 启动 Steel**
 
@@ -145,6 +171,15 @@ Steel 没在运行、本机又装了 Chromium 时，代理仍然能用浏览器�
 #### Steel Cloud
 
 在 [app.steel.dev](https://app.steel.dev) 创建密钥。同一组设置里，**Steel 地址**填 `https://api.steel.dev`，把密钥贴进 **Steel API 密钥**，然后保存。AgentWeb 会用 `steel-api-key` 请求头带上这个密钥。
+
+### nono
+
+[nono](https://github.com/always-further/nono) 让 Claude 运行在内核强制的沙箱里，并把接口秘密留在服务器上。先在服务器上安装 nono（Docker 镜像已自带），再到 **设置 > nono** 中启用。
+
+- **只作用于 Claude 会话。** Shell 标签页、文件树和其他代理不受限制。
+- **Claude 能访问什么。** 当前项目、它自己的配置，以及你添加的文件夹。Git worktree 还会自动获得共享的 `.git`。文件夹改动对新会话生效。
+- **不能添加的文件夹。** 文件系统根目录、主目录和包含主目录的文件夹。在 Linux 上，nono 无法保护已授权目录下的 `~/.ssh` 等路径，所以会拒绝这样的策略。把主目录作为项目打开时也会因此被拒绝。
+- **不会静默降级。** 启用 nono 后，如果 nono 缺失或拒绝策略，Claude 不会启动，对话里会显示原因。修复问题或关闭 nono 即可。
 
 ## 插件
 

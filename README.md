@@ -78,6 +78,32 @@ npm run desktop:dist:mac   # build a macOS .dmg
 npm run desktop:dist:win   # build a Windows installer
 ```
 
+### Docker
+
+Run AgentWeb, nono, the Claude CLI, and Steel together on one Linux machine. This needs Docker with Compose 2.24 or later, and a kernel with Landlock enabled (6.7 or later for nono's network rules).
+
+```bash
+git clone https://github.com/Reagan1947/AgentWeb.git
+cd AgentWeb
+cp .env.docker.example .env
+mkdir -p workspace
+docker compose up -d --build
+```
+
+Open `http://localhost:3001` and set a password on the first visit. To sign in to Claude, set `ANTHROPIC_API_KEY` in `.env` or run `claude login` in the Shell tab. Then turn on nono in **Settings > nono** and enable the browser in **Settings > Browser**. The default Steel address already works.
+
+| `.env` variable | Default | Purpose |
+|---|---|---|
+| `BIND_ADDRESS` | `127.0.0.1` | Interface for the published ports. Use `0.0.0.0` to connect from another machine. |
+| `PUBLIC_HOST` | `localhost` | The host your browser uses to reach this machine. Steel's live view loads from it. |
+| `AGENTWEB_PORT` | `3001` | Host port for the web UI. |
+| `WORKSPACE_DIR` | `./workspace` | Host folder mounted at `/workspace`, where projects live. |
+| `AGENT_UID` | `1000` | Container user ID. Must be able to write to `WORKSPACE_DIR`. |
+
+Steel shares the AgentWeb container's network, so its Chrome can open dev servers your agents start. Agents cannot use ports 3000 or 9223. Accounts, Claude sign-in, and settings are kept in the `agent-home` volume.
+
+Port 3000 and 9223 have no login of their own: anyone who reaches them can control the browser. Check this before you set `BIND_ADDRESS=0.0.0.0` on a machine with a public address.
+
 ## Configuration
 
 Common settings in `.env`:
@@ -111,7 +137,7 @@ npx playwright install-deps chromium
 
 #### Connect Steel
 
-AgentWeb does not start Steel. Run Steel yourself, then save its address in AgentWeb.
+The [Docker setup](#docker) starts Steel for you. Otherwise AgentWeb does not start Steel: run it yourself, then save its address in AgentWeb.
 
 **1. Start Steel**
 
@@ -145,6 +171,15 @@ When Steel is down and local Chromium is installed, the agent still gets a brows
 #### Steel Cloud
 
 Create a key at [app.steel.dev](https://app.steel.dev). In the same settings fields, set **Steel address** to `https://api.steel.dev` and paste the key into **Steel API key**, then save. AgentWeb sends the key in the `steel-api-key` header.
+
+### nono
+
+[nono](https://github.com/always-further/nono) runs Claude inside a kernel-enforced sandbox and keeps API secrets on the server. Install it on the server (the Docker image already includes it), then turn it on in **Settings > nono**.
+
+- **Claude sessions only.** The Shell tab, the file tree, and other agents are not restricted.
+- **What Claude can reach.** The open project, its own config, and the folders you add. Git worktrees also get their shared `.git`. Folder changes apply to new sessions.
+- **Folders you cannot add.** The filesystem root, your home directory, and any folder containing it. On Linux, nono cannot protect `~/.ssh` and similar paths under a folder it has allowed, so it refuses that policy. Opening your home directory as a project is refused for the same reason.
+- **No silent fallback.** While nono is enabled, Claude does not start if nono is missing or rejects the policy. The chat shows the reason. Fix it, or turn nono off.
 
 ## Plugins
 
