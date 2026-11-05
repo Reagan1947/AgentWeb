@@ -1,9 +1,9 @@
 import { memo, useMemo, useState } from 'react';
-import { Bot, ChevronRight, CircleAlert, CircleCheck, CircleDashed } from 'lucide-react';
+import { ChevronRight, CircleAlert, CircleCheck, CircleDashed } from 'lucide-react';
 
 import type { DiffLine, LiveTaskStatus, Project, SubagentActivity, SubagentInfo, ToolResult } from '@/shared/types';
 import { cn } from '@/shared/utils';
-import { Trace, TraceDescription, TraceIcon, TraceLine, TraceTitle } from '@/shared/ui';
+import { AgentIcon, Trace, TraceDescription, TraceIcon, TraceLine, TraceTitle } from '@/shared/ui';
 import { SubagentTimeline } from '@/modules/chat/tools/SubagentTimeline';
 import { useIsExportingTranscript } from '@/modules/chat/context/TranscriptRenderContext';
 import { MarkdownContent } from '@/modules/chat/tools/ContentRenderers/MarkdownContent';
@@ -128,7 +128,7 @@ export const SubagentPanel = memo(({
         >
           <ChevronRight className={cn('h-3 w-3 flex-shrink-0 transition-transform duration-150', isOpen && 'rotate-90')} />
           <TraceIcon className="text-purple-500 dark:text-purple-400">
-            <Bot />
+            <AgentIcon />
           </TraceIcon>
           <TraceTitle className="font-medium text-foreground">{label || 'Agent'}</TraceTitle>
           {description && (

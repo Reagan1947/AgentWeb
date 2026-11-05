@@ -94,6 +94,7 @@ export {
   InputGroupInput,
   InputGroupTextarea,
 } from '@/shared/ui/input-group';
+export { AgentIcon } from '@/shared/ui/AgentIcon';
 export { LLMProviderLogo } from '@/shared/ui/LLMProviderLogo';
 export { PillBar, Pill } from '@/shared/ui/PillBar';
 export { ScrollArea } from '@/shared/ui/ScrollArea';

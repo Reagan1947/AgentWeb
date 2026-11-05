@@ -1,6 +1,5 @@
 import {
   Bell,
-  Bot,
   GitBranch,
   Info,
   KeyRound,
@@ -11,6 +10,8 @@ import {
   Shield,
   Terminal,
 } from 'lucide-react';
+
+import { AgentIcon } from '@/shared/ui/AgentIcon';
 import type { ComponentType } from 'react';
 
 import type { AgentProvider, FileStatusCode, LLMProvider, McpProvider, McpScope, McpTransport, SettingsMainTab } from '@/shared/types';
@@ -110,7 +111,7 @@ type SettingsMainTabMeta = {
  * the command palette turns each entry into an "open settings" command, so both stay in sync.
  */
 export const SETTINGS_MAIN_TABS: SettingsMainTabMeta[] = [
-  { id: 'agents', label: 'Agents', keywords: 'agents subagents claude code', icon: Bot },
+  { id: 'agents', label: 'Agents', keywords: 'agents subagents claude code', icon: AgentIcon },
   { id: 'appearance', label: 'Appearance', keywords: 'appearance theme dark light language thinking parameters', icon: Palette },
   { id: 'commands', label: 'Commands', keywords: 'commands slash skills builtins', icon: Terminal },
   { id: 'git', label: 'Git', keywords: 'git github commits', icon: GitBranch },

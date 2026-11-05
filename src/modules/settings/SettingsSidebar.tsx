@@ -1,8 +1,9 @@
-import { Bell, Bot, GitBranch, Info, Key, ListChecks, Mic, MonitorPlay, Palette, Puzzle, Shield, Terminal } from 'lucide-react';
+import { Bell, GitBranch, Info, Key, ListChecks, Mic, MonitorPlay, Palette, Puzzle, Shield, Terminal } from 'lucide-react';
+import type { ComponentType } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { cn } from '@/shared/utils';
-import { PillBar, Pill } from '@/shared/ui';
+import { AgentIcon, PillBar, Pill } from '@/shared/ui';
 import type { SettingsMainTab } from '@/shared/types';
 
 type SettingsSidebarProps = {
@@ -13,11 +14,11 @@ type SettingsSidebarProps = {
 type NavItem = {
   id: SettingsMainTab;
   labelKey: string;
-  icon: typeof Bot;
+  icon: ComponentType<{ className?: string }>;
 };
 
 const NAV_ITEMS: NavItem[] = [
-  { id: 'agents', labelKey: 'mainTabs.agents', icon: Bot },
+  { id: 'agents', labelKey: 'mainTabs.agents', icon: AgentIcon },
   { id: 'appearance', labelKey: 'mainTabs.appearance', icon: Palette },
   { id: 'commands', labelKey: 'mainTabs.commands', icon: Terminal },
   { id: 'git', labelKey: 'mainTabs.git', icon: GitBranch },

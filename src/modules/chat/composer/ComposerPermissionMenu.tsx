@@ -1,17 +1,16 @@
-import { memo, useCallback, useState } from 'react';
+import { memo, useCallback, useState, type ComponentType } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
   AlertTriangle,
-  Bot,
   ClipboardList,
   Hand,
   ShieldQuestion,
   Smile,
-  type LucideIcon,
 } from 'lucide-react';
 
 import type { PermissionMode } from '@/shared/types';
+import { AgentIcon } from '@/shared/ui';
 import { useComposerMenuAnchor } from '@/modules/chat/hooks/useComposerMenuAnchor';
 import { usePermissionNameFit } from '@/modules/chat/hooks/usePermissionNameFit';
 import {
@@ -21,7 +20,7 @@ import {
 } from '@/modules/chat/composer/ComposerMenuPrimitives';
 
 type ModeAppearance = {
-  icon: LucideIcon;
+  icon: ComponentType<{ className?: string }>;
   /** English name, the fallback for the `codex.modes.<mode>` translation. */
   label: string;
   trigger: string;
@@ -40,7 +39,7 @@ const MODE_APPEARANCE: Record<PermissionMode, ModeAppearance> = {
     item: 'text-foreground',
   },
   auto: {
-    icon: Bot,
+    icon: AgentIcon,
     label: 'Auto Mode',
     trigger:
       'border-blue-300/60 bg-blue-50 text-blue-700 hover:bg-blue-100 dark:border-blue-600/40 dark:bg-blue-900/15 dark:text-blue-300 dark:hover:bg-blue-900/25',
