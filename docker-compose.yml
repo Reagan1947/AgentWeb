@@ -1,0 +1,39 @@
+# AgentWeb, nono, and Steel on one machine: `cp .env.docker.example .env && docker compose up -d --build`
+services:
+  app:
+    build:
+      context: .
+      args:
+        AGENT_UID: ${AGENT_UID:-1000}
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      HOST: 0.0.0.0
+      SERVER_PORT: 3001
+      WORKSPACES_ROOT: /workspace
+    # Steel shares this network namespace, so its ports are published here.
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${AGENTWEB_PORT:-3001}:3001"
+      - "${BIND_ADDRESS:-127.0.0.1}:3000:3000"
+      - "${BIND_ADDRESS:-127.0.0.1}:9223:9223"
+    volumes:
+      - agent-home:/home/agent
+      - ${WORKSPACE_DIR:-./workspace}:/workspace
+
+  # Sharing `localhost` keeps AgentWeb's default Steel address working and lets
+  # Steel's Chrome open dev servers the agents start. Agents cannot use 3000 or 9223.
+  steel:
+    image: ghcr.io/steel-dev/steel-browser:${STEEL_VERSION:-latest}
+    restart: unless-stopped
+    network_mode: service:app
+    depends_on:
+      - app
+    environment:
+      # The host your browser uses to reach this machine. The live view loads from it.
+      DOMAIN: ${PUBLIC_HOST:-localhost}:3000
+      CDP_DOMAIN: ${PUBLIC_HOST:-localhost}:9223
+
+volumes:
+  agent-home:
