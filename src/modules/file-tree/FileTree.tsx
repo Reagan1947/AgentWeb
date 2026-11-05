@@ -11,7 +11,7 @@ import { useFileTreeOperations } from '@/modules/file-tree/hooks/useFileTreeOper
 import { useFileTreeSearch } from '@/modules/file-tree/hooks/useFileTreeSearch';
 import { useFileTreeViewMode } from '@/modules/file-tree/hooks/useFileTreeViewMode';
 import { useFileTreeUpload } from '@/modules/file-tree/hooks/useFileTreeUpload';
-import type { DirectoryRevealRequest, FileTreeImageSelection, FileTreeNode,Project } from '@/shared/types';
+import type { DirectoryRevealRequest, FileTreeImageSelection, FileTreeNode, FileTreeScope, Project } from '@/shared/types';
 import { formatFileSize, formatRelativeTime, isImageFile } from '@/modules/file-tree/utils/fileTreeUtils';
 import { directoryRevealPaths } from '@/modules/file-tree/utils/revealDirectory';
 import { FolderBoldIcon, Input, ScrollArea } from '@/shared/ui';
@@ -25,7 +25,7 @@ import ImageViewer from '@/modules/file-tree/ImageViewer';
 
 type FileTreeProps = {
   selectedProject: Project | null;
-  onFileOpen?: (filePath: string) => void;
+  onFileOpen?: (filePath: string, scope?: FileTreeScope) => void;
   // Directory to reveal (from an in-chat `path/` reference): its ancestors are
   // expanded so the folder is visible without hunting through the tree.
   revealDirectory?: DirectoryRevealRequest | null;
@@ -35,6 +35,8 @@ type FileTreeProps = {
 export default function FileTree({ selectedProject, onFileOpen, revealDirectory }: FileTreeProps) {
   const { t } = useTranslation();
   const [selectedImage, setSelectedImage] = useState<FileTreeImageSelection | null>(null);
+  // Project stays the default so the tree matches the open chat. Workspace lists the server workspace root.
+  const [scope, setScope] = useState<FileTreeScope>('project');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const newItemInputRef = useRef<HTMLInputElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
@@ -52,7 +54,7 @@ export default function FileTree({ selectedProject, onFileOpen, revealDirectory 
     }
   }, [toast]);
 
-  const { files, loading, error, refreshFiles } = useFileTreeData(selectedProject);
+  const { files, loading, error, refreshFiles } = useFileTreeData(selectedProject, scope);
   const { viewMode, changeViewMode } = useFileTreeViewMode();
   const { expandedDirs, toggleDirectory, expandDirectories, collapseAll } = useExpandedDirectories();
   const { searchQuery, setSearchQuery, filteredFiles } = useFileTreeSearch({
@@ -83,6 +85,7 @@ export default function FileTree({ selectedProject, onFileOpen, revealDirectory 
   // File operations
   const operations = useFileTreeOperations({
     selectedProject,
+    scope,
     onRefresh: refreshFiles,
     showToast,
   });
@@ -91,6 +94,7 @@ export default function FileTree({ selectedProject, onFileOpen, revealDirectory 
   // so the remaining plain values are not treated as render-time ref reads.
   const { treeRef, ...upload } = useFileTreeUpload({
     selectedProject,
+    scope,
     onRefresh: refreshFiles,
     showToast,
   });
@@ -142,26 +146,31 @@ export default function FileTree({ selectedProject, onFileOpen, revealDirectory 
   // Centralized click behavior keeps file actions identical across all presentation modes.
   const handleItemClick = useCallback(
     (item: FileTreeNode) => {
+      if (item.locked) {
+        return;
+      }
+
       if (item.type === 'directory') {
         toggleDirectory(item.path);
         return;
       }
 
-      if (isImageFile(item.name) && selectedProject) {
+      if (isImageFile(item.name) && (scope === 'workspace' || selectedProject)) {
         setSelectedImage({
           name: item.name,
           path: item.path,
-          projectPath: selectedProject.path,
+          projectPath: selectedProject?.path,
           // Image URL uses the DB projectId so ImageViewer can hit the
           // /api/file-tree/projects/:projectId/files/content endpoint directly.
-          projectId: selectedProject.projectId,
+          projectId: selectedProject?.projectId ?? '',
+          scope,
         });
         return;
       }
 
-      onFileOpen?.(item.path);
+      onFileOpen?.(item.path, scope);
     },
-    [onFileOpen, selectedProject, toggleDirectory],
+    [onFileOpen, scope, selectedProject, toggleDirectory],
   );
 
   const formatRelativeTimeLabel = useCallback(
@@ -210,6 +219,8 @@ export default function FileTree({ selectedProject, onFileOpen, revealDirectory 
       )}
 
       <FileTreeHeader
+        scope={scope}
+        onScopeChange={setScope}
         viewMode={viewMode}
         onViewModeChange={changeViewMode}
         searchQuery={searchQuery}

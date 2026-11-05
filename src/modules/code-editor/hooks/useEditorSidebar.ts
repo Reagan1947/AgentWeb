@@ -42,7 +42,12 @@ export const useEditorSidebar = ({
   // Returns whether the file was opened, i.e. false when the user kept the
   // unsaved buffer, so callers can skip follow-ups such as switching tabs.
   const handleFileOpen = useCallback(
-    (filePath: string, diffInfo: CodeEditorDiffInfo | null = null, line: number | null = null): boolean => {
+    (
+      filePath: string,
+      diffInfo: CodeEditorDiffInfo | null = null,
+      line: number | null = null,
+      scope: 'project' | 'workspace' = 'project',
+    ): boolean => {
       // Only the open file of the same project (nested projects share absolute
       // paths) without a diff payload reuses the buffer; any other open reloads
       // it and would lose unsaved edits, so it asks like closing does.
@@ -50,6 +55,7 @@ export const useEditorSidebar = ({
       const reusesBuffer = openFile !== null
         && openFile.path === filePath
         && openFile.projectId === selectedProject?.projectId
+        && (openFile.fileScope ?? 'project') === scope
         && !openFile.diffInfo
         && !diffInfo;
       if (
@@ -72,6 +78,7 @@ export const useEditorSidebar = ({
         // DB projectId is forwarded to the editor so it can read/save files
         // via `/api/file-tree/projects/:projectId/file` endpoints.
         projectId: selectedProject?.projectId,
+        fileScope: scope,
         diffInfo,
         line,
       });

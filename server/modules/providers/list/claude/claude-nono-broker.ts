@@ -418,3 +418,39 @@ export async function applyClaudeNonoBroker(input: {
     },
   };
 }
+
+function quoteLaunchArgument(value: string): string {
+  if (process.platform === 'win32') {
+    return `'${value.replace(/'/g, "''")}'`;
+  }
+  return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
+/**
+ * Rewrites the Shell tab's Claude command so a signed-in user's nono choice applies there too.
+ * The websocket shell gateway calls this for Agent mode. The operator terminal does not.
+ * Returns null when nono is off and there is no vault environment to pass through.
+ */
+export async function prepareShellClaudeLaunch(input: {
+  userId: number;
+  projectPath: string;
+  command: string;
+}): Promise<{ command: string; env: NodeJS.ProcessEnv; sandboxed: boolean } | null> {
+  const broker = await applyClaudeNonoBroker({
+    userId: input.userId,
+    projectPath: input.projectPath,
+    claudeExecutable: undefined,
+  });
+  if (!broker) {
+    return null;
+  }
+  const sandboxed = Boolean(broker.executablePath);
+  const invocation = sandboxed && broker.executablePath
+    ? `${quoteLaunchArgument(process.execPath)} ${quoteLaunchArgument(broker.executablePath)}`
+    : '';
+  return {
+    command: sandboxed ? input.command.replace(/\bclaude\b/g, invocation) : input.command,
+    env: broker.env,
+    sandboxed,
+  };
+}

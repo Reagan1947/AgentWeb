@@ -80,7 +80,7 @@ npm run desktop:dist:win   # build a Windows installer
 
 ### Docker
 
-Run AgentWeb, nono, the Claude CLI, and Steel together on one Linux machine. This needs Docker with Compose 2.24 or later, and a kernel with Landlock enabled (6.7 or later for nono's network rules).
+Run AgentWeb, nono, the agent CLIs, and Steel together on one Linux machine. This needs Docker with Compose 2.24 or later, and a kernel with Landlock enabled (6.7 or later for nono's network rules).
 
 ```bash
 git clone https://github.com/Reagan1947/AgentWeb.git
@@ -103,7 +103,7 @@ Open `http://localhost:3001` and set a password on the first visit. To sign in t
 | `AGENT_UID` | `1000` | Container user ID. Must be able to write to `WORKSPACE_DIR`. |
 | `OPTIONAL_TOOLS` | empty | Extra tools built into the image: `jdk8`, `jdk17`. |
 
-The image includes common development tools, because agents cannot install system packages themselves: `gh`, `pnpm`, `bun`, `uv`, Python `pip` and `venv`, Go, database clients, and MEGAcmd. To add JDK 8 or 17 with Maven, set `OPTIONAL_TOOLS=jdk8,jdk17` in `.env`. JDK 17 is then the default; point `JAVA_HOME` at `$JDK8_HOME` to switch. To add anything else, edit `docker/extra-tools.sh`. Rebuild after either change.
+The image includes the agent CLIs AgentWeb launches: Claude Code, Codex (`codex`), Cursor (`cursor-agent`), and OpenCode 1 (`opencode`). It also includes common development tools, because agents cannot install system packages themselves: `gh`, `pnpm`, `bun`, `uv`, Python `pip` and `venv`, Go, database clients, and MEGAcmd. To add JDK 8 or 17 with Maven, set `OPTIONAL_TOOLS=jdk8,jdk17` in `.env`. JDK 17 is then the default; point `JAVA_HOME` at `$JDK8_HOME` to switch. To add anything else, edit `docker/extra-tools.sh`. Rebuild after either change.
 
 Steel shares the AgentWeb container's network, so its Chrome can open dev servers your agents start. Agents cannot use ports 3000 or 9223. Steel is built from a pinned commit, because it only publishes a `latest` image and the next commit breaks the live view. Change `STEEL_REF` to move it. Accounts, Claude sign-in, and settings are kept in the `agent-home` volume.
 
@@ -196,7 +196,7 @@ Create a key at [app.steel.dev](https://app.steel.dev). In the same settings fie
 
 [nono](https://github.com/always-further/nono) runs Claude inside a kernel-enforced sandbox and keeps API secrets on the server. Install it on the server (the Docker image already includes it), then turn it on in **Settings > nono**.
 
-- **Claude sessions only.** The Shell tab, the file tree, and other agents are not restricted.
+- **Claude sessions, including Agent mode in the Shell tab.** Both go through nono when it is on. Terminal mode in the Shell tab, the Workspace view in Files, and other agents do not. Terminal mode and Workspace view stay inside the server workspace root. Credential directories such as `.ssh` stay visible and locked.
 - **What Claude can reach.** The open project, its own config, package manager caches such as `~/.npm` and `~/.m2`, and the folders you add. Git worktrees also get their shared `.git`. Folder changes apply to new sessions.
 - **Folders you cannot add.** The filesystem root, your home directory, and any folder containing it. On Linux, nono cannot protect `~/.ssh` and similar paths under a folder it has allowed, so it refuses that policy. Opening your home directory as a project is refused for the same reason.
 - **No silent fallback.** While nono is enabled, Claude does not start if nono is missing or rejects the policy. The chat shows the reason. Fix it, or turn nono off.

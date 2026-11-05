@@ -1,0 +1,22 @@
+#!/bin/sh
+# Asks AgentWeb to start or restart MEGAcmd. A server started from an agent would inherit nono's
+# sandbox and a proxy that dies with the session, so AgentWeb starts it from outside instead.
+# Usage: agentweb-mega restart|ensure
+set -eu
+
+case "${1:-}" in
+  restart | ensure) action="$1" ;;
+  *) echo "Usage: agentweb-mega restart|ensure" >&2; exit 2 ;;
+esac
+
+token_file="$HOME/.megaCmd/.agentweb-control-token"
+if [ ! -r "$token_file" ]; then
+  echo "agentweb-mega: cannot read $token_file" >&2
+  exit 1
+fi
+
+# The token goes through stdin so it does not appear in the process list.
+printf 'header = "Authorization: Bearer %s"\n' "$(cat "$token_file")" |
+  curl --config - --noproxy '*' -fsS --max-time 60 -X POST \
+    "http://127.0.0.1:${SERVER_PORT:-3001}/api/mega-control-agent/$action"
+echo

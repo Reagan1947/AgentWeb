@@ -2,13 +2,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { DragEvent } from 'react';
 
 import { IS_PLATFORM } from '@/shared/utils';
-import type { FileTreeUploadProgressState, Project } from '@/shared/types';
+import type { FileTreeScope, FileTreeUploadProgressState, Project } from '@/shared/types';
 import { api } from '@/shared/api';
 import { expireAuthSession, getStoredAuthToken, storeAuthToken } from '@/shared/authToken';
 import { MAX_FILE_UPLOAD_SIZE_BYTES, MAX_FILE_UPLOAD_SIZE_LABEL } from '@/shared/constants';
 
 type UseFileTreeUploadOptions = {
   selectedProject: Project | null;
+  scope?: FileTreeScope;
   onRefresh: () => void;
   showToast: (message: string, type: 'success' | 'error') => void;
 };
@@ -96,14 +97,14 @@ const buildUploadFormData = (files: File[], targetPath: string) => {
 };
 
 const uploadFormDataWithProgress = (
-  projectId: string,
+  url: string,
   formData: FormData,
   onProgress: (progress: number) => void,
 ) =>
   new Promise<UploadResponse>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
 
-    xhr.open('POST', api.uploadFilesUrl(projectId));
+    xhr.open('POST', url);
 
     const token = getStoredAuthToken();
     if (!IS_PLATFORM && token) {
@@ -237,6 +238,7 @@ const collectDroppedFiles = async (dataTransfer: DataTransfer) => {
 
 export const useFileTreeUpload = ({
   selectedProject,
+  scope = 'project',
   onRefresh,
   showToast,
 }: UseFileTreeUploadOptions) => {
@@ -291,7 +293,7 @@ export const useFileTreeUpload = ({
 
       const fileName = files.length === 1 ? getFileDisplayName(files[0]) : undefined;
 
-      if (!selectedProject) {
+      if (scope !== 'workspace' && !selectedProject) {
         const message = 'Select a project before uploading files.';
         showToast(message, 'error');
         setUploadError(message, files.length, targetPath, fileName);
@@ -318,8 +320,11 @@ export const useFileTreeUpload = ({
       let latestProgress = 0;
 
       try {
+        const uploadUrl = scope === 'workspace' || !selectedProject
+          ? api.uploadWorkspaceFilesUrl()
+          : api.uploadFilesUrl(selectedProject.projectId);
         const response = await uploadFormDataWithProgress(
-          selectedProject.projectId,
+          uploadUrl,
           buildUploadFormData(files, targetPath),
           (progress) => {
             latestProgress = progress;
@@ -362,6 +367,7 @@ export const useFileTreeUpload = ({
       clearProgressTimer,
       onRefresh,
       scheduleProgressClear,
+      scope,
       selectedProject,
       setUploadError,
       showToast,

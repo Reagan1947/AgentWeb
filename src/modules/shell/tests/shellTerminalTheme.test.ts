@@ -296,6 +296,45 @@ test('the shell init message tells the server which colour scheme the terminal i
   assert.equal(initFrame.colorScheme, 'light');
 });
 
+test('terminal mode asks the server for the operator shell and drops the agent command', () => {
+  vi.useFakeTimers();
+
+  const view = renderHook(() =>
+    useShellConnection({
+      wsRef: ref<WebSocket | null>(null),
+      terminalRef: ref({ write: vi.fn(), cols: 80, rows: 24 } as unknown as Terminal | null),
+      fitAddonRef: ref({ fit: vi.fn() } as unknown as FitAddon | null),
+      selectedProjectRef: ref<Project | null | undefined>(project),
+      selectedSessionRef: ref<ProjectSession | null | undefined>({ id: 'session-1' } as ProjectSession),
+      initialCommandRef: ref<string | null | undefined>('claude'),
+      isPlainShellRef: ref(false),
+      shellModeRef: ref<'agent' | 'terminal'>('terminal'),
+      bypassPermissionsRef: ref(false),
+      isDarkModeRef: ref(true),
+      onProcessCompleteRef: ref<((exitCode: number) => void) | null | undefined>(null),
+      isInitialized: true,
+      autoConnect: false,
+      closeSocket: vi.fn(),
+      clearTerminalScreen: vi.fn(),
+    }),
+  );
+
+  act(() => {
+    view.result.current.connectToShell();
+  });
+  act(() => {
+    FakeSocket.last?.onopen?.();
+    vi.advanceTimersByTime(TERMINAL_INIT_DELAY_MS);
+  });
+
+  const initFrame = JSON.parse(FakeSocket.last?.sent[0] ?? '{}') as Record<string, unknown>;
+  assert.equal(initFrame.provider, 'operator-terminal');
+  assert.equal(initFrame.isPlainShell, true);
+  assert.equal(initFrame.initialCommand, null);
+  assert.equal(initFrame.sessionId, null);
+  assert.equal(initFrame.hasSession, false);
+});
+
 type ShellRuntimeView = {
   runtime: ReturnType<typeof useShellRuntime>;
   theme: ReturnType<typeof useTheme>;

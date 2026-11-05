@@ -8,6 +8,7 @@ import test from 'node:test';
 
 import { WebSocket } from 'ws';
 
+import { WORKSPACES_ROOT } from '@/shared/utils.js';
 import { handleShellConnection } from '@/modules/websocket/services/shell-websocket.service.js';
 
 function createFakeSocket() {
@@ -745,4 +746,89 @@ test('other shells and initial commands only get the COLORFGBG hint', () => {
       ['0;15', '0;15', '0;15', '15;0']
     );
   });
+});
+
+test('operator terminal starts an interactive shell without model API keys', () => {
+  const previousKey = process.env.ANTHROPIC_API_KEY;
+  process.env.ANTHROPIC_API_KEY = 'sk-test-secret';
+  const pty = createFakePty();
+  const calls: Array<{ args: string[]; cwd?: string; env: NodeJS.ProcessEnv }> = [];
+  try {
+    const socket = createFakeSocket();
+    handleShellConnection(socket as never, {
+      resolveProviderSessionId: () => null,
+      spawnPty: (_shell: string, args: string | string[], options?: { cwd?: string; env?: NodeJS.ProcessEnv }) => {
+        calls.push({
+          args: Array.isArray(args) ? args : [args],
+          cwd: options?.cwd,
+          env: options?.env ?? {},
+        });
+        return pty as never;
+      },
+    });
+    socket.emit('message', JSON.stringify({
+      type: 'init',
+      projectPath: process.cwd(),
+      provider: 'operator-terminal',
+      hasSession: false,
+    }));
+
+    assert.equal(calls.length, 1);
+    assert.deepEqual(calls[0].args, process.platform === 'win32' ? ['-NoLogo', '-NoExit'] : ['-i']);
+    assert.equal(calls[0].cwd, WORKSPACES_ROOT);
+    assert.equal(calls[0].env.ANTHROPIC_API_KEY, undefined);
+    assert.match(socket.frames.join('\n'), /does not run inside nono/);
+  } finally {
+    pty.emitExit();
+    if (previousKey === undefined) {
+      delete process.env.ANTHROPIC_API_KEY;
+    } else {
+      process.env.ANTHROPIC_API_KEY = previousKey;
+    }
+  }
+});
+
+test('agent shell applies a sandboxed Claude launch and drops model API keys', async () => {
+  const previousKey = process.env.ANTHROPIC_API_KEY;
+  process.env.ANTHROPIC_API_KEY = 'sk-test-secret';
+  const pty = createFakePty();
+  const calls: Array<{ args: string[]; env: NodeJS.ProcessEnv }> = [];
+  try {
+    const socket = createFakeSocket();
+    handleShellConnection(socket as never, {
+      resolveProviderSessionId: () => null,
+      prepareClaudeLaunch: async ({ command }) => ({
+        command: command.replace(/\bclaude\b/g, "'node' 'wrapper.js'"),
+        env: { CLOUDCLI_NONO_BIN: 'nono' },
+        sandboxed: true,
+      }),
+      spawnPty: (_shell: string, args: string | string[], options?: { env?: NodeJS.ProcessEnv }) => {
+        calls.push({
+          args: Array.isArray(args) ? args : [args],
+          env: options?.env ?? {},
+        });
+        return pty as never;
+      },
+    }, { user: { userId: 7 } } as never);
+    socket.emit('message', JSON.stringify({
+      type: 'init',
+      projectPath: process.cwd(),
+      provider: 'claude',
+      hasSession: false,
+      sessionId: `nono-shell-${Date.now()}`,
+    }));
+    await new Promise((resolve) => setImmediate(resolve));
+
+    assert.equal(calls.length, 1);
+    assert.match(calls[0].args.at(-1) ?? '', /wrapper\.js/);
+    assert.equal(calls[0].env.ANTHROPIC_API_KEY, undefined);
+    assert.equal(calls[0].env.CLOUDCLI_NONO_BIN, 'nono');
+  } finally {
+    pty.emitExit();
+    if (previousKey === undefined) {
+      delete process.env.ANTHROPIC_API_KEY;
+    } else {
+      process.env.ANTHROPIC_API_KEY = previousKey;
+    }
+  }
 });

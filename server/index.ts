@@ -13,6 +13,7 @@ import { AppError, findApplicationRoot, getModuleDirectory, IS_PLATFORM, termina
 import {
     closeSessionsWatcher,
     initializeSessionsWatcher,
+    prepareShellClaudeLaunch,
     providerRuntimeService,
 } from '@/modules/providers/index.js';
 import { chatRunRegistry, createWebSocketServer } from '@/modules/websocket/index.js';
@@ -50,6 +51,7 @@ import {
 import browserUseRoutes from './modules/browser-use/browser-use.routes.js';
 import { assetsRoutes } from './modules/assets/index.js';
 import { fileTreeRoutes } from './modules/file-tree/index.js';
+import { createMegaControlModule } from './modules/mega-control/index.js';
 import { worktreesRoutes } from './modules/worktrees/index.js';
 import browserUseMcpRoutes from './modules/browser-use/browser-use-mcp.routes.js';
 import { browserUseService } from './modules/browser-use/browser-use.service.js';
@@ -97,6 +99,7 @@ const agentRoutes = createAgentModule({
     queryCodex,
     queryOpenCode,
 });
+const megaControl = createMegaControlModule();
 
 // Single WebSocket server that handles chat, shell, and plugin proxy paths.
 // A completed run stays subscribable while its session's background work
@@ -120,6 +123,7 @@ createWebSocketServer(server, {
 
             return null;
         },
+        prepareClaudeLaunch: prepareShellClaudeLaunch,
     },
     getPluginPort,
 });
@@ -182,6 +186,9 @@ app.use('/api/commands', authenticateToken, commandsRoutes);
 
 // Settings API Routes (protected)
 app.use('/api/settings', authenticateToken, settingsRoutes);
+app.use('/api/mega-control', authenticateToken, megaControl.userRoutes);
+// The helper script calls this from inside the container. It checks its own token, not the user session.
+app.use('/api/mega-control-agent', megaControl.agentRoutes);
 
 app.use('/api/system', authenticateToken, systemRoutes);
 
@@ -377,6 +384,9 @@ async function startServer() {
             // Sends anything that came due while the server was not running,
             // then keeps polling.
             initializeScheduledMessageDispatcher(providerRuntimeService);
+            megaControl.ensureRunningOnStartup().catch((error) => {
+                console.error('[mega-control] startup failed:', getErrorMessage(error));
+            });
 
             // Start server-side plugin processes for enabled plugins
             startEnabledPluginServers().catch(err => {

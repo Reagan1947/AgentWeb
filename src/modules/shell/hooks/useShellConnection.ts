@@ -20,6 +20,7 @@ type UseShellConnectionOptions = {
   selectedSessionRef: MutableRefObject<ProjectSession | null | undefined>;
   initialCommandRef: MutableRefObject<string | null | undefined>;
   isPlainShellRef: MutableRefObject<boolean>;
+  shellModeRef?: MutableRefObject<'agent' | 'terminal'>;
   bypassPermissionsRef: MutableRefObject<boolean>;
   isDarkModeRef: MutableRefObject<boolean>;
   onProcessCompleteRef: MutableRefObject<((exitCode: number) => void) | null | undefined>;
@@ -47,6 +48,7 @@ export function useShellConnection({
   selectedSessionRef,
   initialCommandRef,
   isPlainShellRef,
+  shellModeRef,
   bypassPermissionsRef,
   isDarkModeRef,
   onProcessCompleteRef,
@@ -62,6 +64,8 @@ export function useShellConnection({
   // the server knows it: a reconnect can reattach to a CLI started in another
   // theme. Null when the pty runs anything else or no socket is open.
   const [claudeLaunchColorScheme, setClaudeLaunchColorScheme] = useState<'light' | 'dark' | null>(null);
+  const fallbackShellModeRef = useRef<'agent' | 'terminal'>('agent');
+  const activeShellModeRef = shellModeRef ?? fallbackShellModeRef;
   const connectingRef = useRef(false);
   const forceRestartOnInitRef = useRef(false);
   const suppressAutoConnectRef = useRef(false);
@@ -165,16 +169,21 @@ export function useShellConnection({
             const forceRestart = forceRestartOnInitRef.current;
             forceRestartOnInitRef.current = false;
 
+            const operatorShell = activeShellModeRef.current === 'terminal';
             sendSocketMessage(socket, {
               type: 'init',
               projectPath: currentProject.fullPath || currentProject.path || '',
-              sessionId: isPlainShellRef.current ? null : selectedSessionRef.current?.id || null,
-              hasSession: isPlainShellRef.current ? false : Boolean(selectedSessionRef.current),
-              provider: isPlainShellRef.current ? 'plain-shell' : (selectedSessionRef.current?.__provider || readSelectedProvider()),
+              sessionId: operatorShell || isPlainShellRef.current ? null : selectedSessionRef.current?.id || null,
+              hasSession: operatorShell || isPlainShellRef.current ? false : Boolean(selectedSessionRef.current),
+              provider: operatorShell
+                ? 'operator-terminal'
+                : isPlainShellRef.current
+                  ? 'plain-shell'
+                  : (selectedSessionRef.current?.__provider || readSelectedProvider()),
               cols: currentTerminal.cols,
               rows: currentTerminal.rows,
-              initialCommand: initialCommandRef.current,
-              isPlainShell: isPlainShellRef.current,
+              initialCommand: operatorShell ? null : initialCommandRef.current,
+              isPlainShell: operatorShell || isPlainShellRef.current,
               forceRestart,
               // Launch-time flag: bypass mode can only join the CLI's
               // shift+tab cycle when claude starts with it.
@@ -219,6 +228,7 @@ export function useShellConnection({
       isConnected,
       isConnecting,
       isDarkModeRef,
+      activeShellModeRef,
       isPlainShellRef,
       selectedProjectRef,
       selectedSessionRef,

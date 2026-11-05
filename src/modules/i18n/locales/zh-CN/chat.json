@@ -223,7 +223,12 @@
     "resumeSession": "恢复会话：{{displayName}}...",
     "runCommand": "在 {{projectName}} 中运行 {{command}}",
     "startCli": "在 {{projectName}} 中启动 Claude CLI",
-    "defaultCommand": "命令"
+    "defaultCommand": "命令",
+    "modeLabel": "Shell 模式",
+    "modeAgent": "Agent",
+    "modeTerminal": "终端",
+    "operatorReady": "操作终端。此 Shell 不经过 nono。",
+    "operatorHint": "此终端不经过 nono。"
   },
   "claudeStatus": {
     "actions": {

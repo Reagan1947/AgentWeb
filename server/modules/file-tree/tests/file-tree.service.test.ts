@@ -403,7 +403,11 @@ test('createEntry performs filesystem mutation only through the injected adapter
  * which is the only way to exercise the read-only roots: the whole guarantee
  * rests on `realpath` resolving symlinks before the comparison.
  */
-function createRealFileSystemService(projectRoot: string, workspaceRoot = projectRoot): FileTreeServices {
+function createRealFileSystemService(
+  projectRoot: string,
+  workspaceRoot = projectRoot,
+  validatePath: FileTreeServiceDependencies['workspace']['validatePath'] = validateWorkspacePath,
+): FileTreeServices {
   return createFileTreeService({
     fileSystem: {
       access: (candidatePath) => fsPromises.access(candidatePath),
@@ -429,7 +433,7 @@ function createRealFileSystemService(projectRoot: string, workspaceRoot = projec
     projects: { getProjectPathById: async () => projectRoot },
     workspace: {
       rootPath: workspaceRoot,
-      validatePath: (candidatePath) => validateWorkspacePath(candidatePath),
+      validatePath,
       resolveReadOnlyRootPath: (candidatePath) => resolveReadOnlyRootPath(candidatePath),
     },
     resolveMimeType: () => 'text/plain',
@@ -573,5 +577,52 @@ test('a file in another folder of the workspace can be read, but never written t
   } finally {
     await fsPromises.rm(workspaceRoot, { recursive: true, force: true });
     await fsPromises.rm(outsideDirectory, { recursive: true, force: true });
+  }
+});
+
+test('workspace files list sibling projects and refuse credential directories', async () => {
+  const workspaceRoot = await fsPromises.mkdtemp(path.join(os.tmpdir(), 'file-tree-workspace-'));
+  const projectDirectory = path.join(workspaceRoot, 'alpha');
+  const credentialDirectory = path.join(workspaceRoot, '.ssh');
+  try {
+    await fsPromises.mkdir(projectDirectory);
+    await fsPromises.writeFile(path.join(projectDirectory, 'readme.txt'), 'hello', 'utf8');
+    await fsPromises.mkdir(credentialDirectory);
+    await fsPromises.writeFile(path.join(credentialDirectory, 'id_rsa'), 'secret', 'utf8');
+
+    const service = createRealFileSystemService(projectDirectory, workspaceRoot, async (candidatePath) => {
+      const resolved = path.resolve(candidatePath);
+      const root = path.resolve(workspaceRoot);
+      if (resolved === root || resolved.startsWith(`${root}${path.sep}`)) {
+        return { valid: true, resolvedPath: resolved };
+      }
+      return { valid: false, error: 'outside' };
+    });
+
+    const tree = await service.listWorkspaceFiles();
+    const ssh = tree.find((entry) => entry.name === '.ssh');
+    const alpha = tree.find((entry) => entry.name === 'alpha');
+    assert.equal(ssh?.locked, true);
+    assert.equal(ssh?.children, undefined);
+    assert.equal(alpha?.type, 'directory');
+    assert.equal(alpha?.children?.[0]?.name, 'readme.txt');
+
+    const created = await service.createWorkspaceEntry({
+      parentPath: projectDirectory,
+      type: 'file',
+      name: 'notes.txt',
+    });
+    assert.equal(await fsPromises.readFile(created.path, 'utf8'), '');
+
+    await assert.rejects(
+      service.readWorkspaceTextFile(path.join(credentialDirectory, 'id_rsa')),
+      (error: unknown) => (error as AppError).code === 'LOCKED_CREDENTIAL_PATH',
+    );
+    await assert.rejects(
+      service.createWorkspaceEntry({ parentPath: credentialDirectory, type: 'file', name: 'extra' }),
+      (error: unknown) => (error as AppError).code === 'LOCKED_CREDENTIAL_PATH',
+    );
+  } finally {
+    await fsPromises.rm(workspaceRoot, { recursive: true, force: true });
   }
 });

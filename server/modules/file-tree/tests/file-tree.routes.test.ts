@@ -24,6 +24,14 @@ function createFakeServices(overrides: Partial<FileTreeServices> = {}): FileTree
     renameEntry: unexpectedOperation,
     deleteEntry: unexpectedOperation,
     storeUploadedFiles: unexpectedOperation,
+    listWorkspaceFiles: unexpectedOperation,
+    readWorkspaceTextFile: unexpectedOperation,
+    openWorkspaceFile: unexpectedOperation,
+    saveWorkspaceTextFile: unexpectedOperation,
+    createWorkspaceEntry: unexpectedOperation,
+    renameWorkspaceEntry: unexpectedOperation,
+    deleteWorkspaceEntry: unexpectedOperation,
+    storeWorkspaceUploads: unexpectedOperation,
     ...overrides,
   };
 }
@@ -154,4 +162,23 @@ test('create route rejects invalid entry types without calling the service', asy
   });
 
   assert.equal(createCalled, false);
+});
+
+test('workspace files route lists the workspace without a project id', async () => {
+  let listed = false;
+  const services = createFakeServices({
+    listWorkspaceFiles: async () => {
+      listed = true;
+      return [];
+    },
+  });
+
+  await withFileTreeServer(services, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/file-tree/workspace/files`);
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), []);
+  });
+
+  assert.equal(listed, true);
 });

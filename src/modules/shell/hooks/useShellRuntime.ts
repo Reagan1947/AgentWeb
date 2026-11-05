@@ -13,6 +13,7 @@ type UseShellRuntimeOptions = {
   selectedSession: ProjectSession | null | undefined;
   initialCommand: string | null | undefined;
   isPlainShell: boolean;
+  shellMode?: 'agent' | 'terminal';
   bypassPermissions: boolean;
   minimal: boolean;
   autoConnect: boolean;
@@ -40,6 +41,7 @@ export function useShellRuntime({
   selectedSession,
   initialCommand,
   isPlainShell,
+  shellMode = 'agent',
   bypassPermissions,
   minimal,
   autoConnect,
@@ -57,6 +59,7 @@ export function useShellRuntime({
   const selectedSessionRef = useRef(selectedSession);
   const initialCommandRef = useRef(initialCommand);
   const isPlainShellRef = useRef(isPlainShell);
+  const shellModeRef = useRef(shellMode);
   const bypassPermissionsRef = useRef(bypassPermissions);
   const isDarkModeRef = useRef(isDarkMode);
   const onProcessCompleteRef = useRef(onProcessComplete);
@@ -68,10 +71,11 @@ export function useShellRuntime({
     selectedSessionRef.current = selectedSession;
     initialCommandRef.current = initialCommand;
     isPlainShellRef.current = isPlainShell;
+    shellModeRef.current = shellMode;
     bypassPermissionsRef.current = bypassPermissions;
     isDarkModeRef.current = isDarkMode;
     onProcessCompleteRef.current = onProcessComplete;
-  }, [selectedProject, selectedSession, initialCommand, isPlainShell, bypassPermissions, isDarkMode, onProcessComplete]);
+  }, [selectedProject, selectedSession, initialCommand, isPlainShell, shellMode, bypassPermissions, isDarkMode, onProcessComplete]);
 
   const closeSocket = useCallback(() => {
     const activeSocket = wsRef.current;
@@ -114,6 +118,7 @@ export function useShellRuntime({
     selectedSessionRef,
     initialCommandRef,
     isPlainShellRef,
+    shellModeRef,
     bypassPermissionsRef,
     isDarkModeRef,
     onProcessCompleteRef,

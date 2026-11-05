@@ -34,6 +34,8 @@ type ShellProps = {
   minimal?: boolean;
   autoConnect?: boolean;
   isActive?: boolean;
+  /** Workspace shell tab. Adds an operator terminal that is not the agent and not inside nono. */
+  allowOperatorShell?: boolean;
 };
 
 /** Exported through the shell barrel: the standalone-shell module renders it as a full-page terminal and the task-master module embeds it in its setup modal to run TaskMaster's init command. */
@@ -46,9 +48,13 @@ export default function Shell({
   minimal = false,
   autoConnect = false,
   isActive = true,
+  allowOperatorShell = false,
 }: ShellProps) {
   const { t } = useTranslation('chat');
   const [isRestarting, setIsRestarting] = useState(false);
+  // Agent launches Claude. Terminal is a plain shell at the workspace root.
+  const [shellMode, setShellMode] = useState<'agent' | 'terminal'>('agent');
+  const operatorShell = allowOperatorShell && shellMode === 'terminal';
   // Seeded from the chat composer's persisted permission setting; the header
   // toggle only changes this shell's launches, not the chat setting.
   const [bypassPermissions, setBypassPermissions] = useState(
@@ -74,7 +80,8 @@ export default function Shell({
     selectedProject,
     selectedSession,
     initialCommand,
-    isPlainShell,
+    isPlainShell: isPlainShell || operatorShell,
+    shellMode: operatorShell ? 'terminal' : 'agent',
     bypassPermissions,
     minimal,
     autoConnect,
@@ -212,9 +219,17 @@ export default function Shell({
     }, SHELL_RESTART_DELAY_MS);
   }, []);
 
-  const shellProvider = isPlainShell
+  const shellProvider = operatorShell || isPlainShell
     ? 'plain-shell'
     : selectedSession?.__provider || readSelectedProvider();
+
+  const handleShellModeChange = useCallback((mode: 'agent' | 'terminal') => {
+    if (mode === shellMode) {
+      return;
+    }
+    setShellMode(mode);
+    handleRestartShell();
+  }, [handleRestartShell, shellMode]);
 
   const handleToggleBypassPermissions = useCallback(() => {
     setBypassPermissions((enabled) => !enabled);
@@ -272,7 +287,9 @@ export default function Shell({
     );
   }
 
-  const readyDescription = isPlainShell
+  const readyDescription = operatorShell
+    ? t('shell.operatorReady', 'Operator terminal. This shell does not run inside nono.')
+    : isPlainShell
     ? t('shell.runCommand', {
         command: initialCommand || t('shell.defaultCommand'),
         projectName: selectedProject.displayName,
@@ -281,7 +298,9 @@ export default function Shell({
       ? t('shell.resumeSession', { displayName: sessionDisplayNameLong })
       : t('shell.startSession');
 
-  const connectingDescription = isPlainShell
+  const connectingDescription = operatorShell
+    ? t('shell.operatorReady', 'Operator terminal. This shell does not run inside nono.')
+    : isPlainShell
     ? t('shell.runCommand', {
         command: initialCommand || t('shell.defaultCommand'),
         projectName: selectedProject.displayName,
@@ -295,6 +314,10 @@ export default function Shell({
   return (
     <div className="flex h-full w-full flex-col bg-card dark:bg-background">
       <ShellHeader
+        showModeToggle={allowOperatorShell}
+        shellMode={shellMode}
+        onShellModeChange={handleShellModeChange}
+        operatorHint={operatorShell ? t('shell.operatorHint', 'This terminal does not run inside nono.') : null}
         isConnected={isConnected}
         isInitialized={isInitialized}
         isRestarting={isRestarting}

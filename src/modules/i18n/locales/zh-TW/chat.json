@@ -239,7 +239,12 @@
     "resumeSession": "恢復工作階段：{{displayName}}...",
     "runCommand": "在 {{projectName}} 中執行 {{command}}",
     "startCli": "在 {{projectName}} 中啟動 Claude CLI",
-    "defaultCommand": "指令"
+    "defaultCommand": "指令",
+    "modeLabel": "Shell 模式",
+    "modeAgent": "Agent",
+    "modeTerminal": "終端",
+    "operatorReady": "操作終端。此 Shell 不經過 nono。",
+    "operatorHint": "此終端不經過 nono。"
   },
   "claudeStatus": {
     "actions": {

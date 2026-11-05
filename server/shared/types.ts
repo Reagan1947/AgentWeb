@@ -1377,6 +1377,11 @@ export type FileTreeNode = {
   permissions: string;
   permissionsRwx: string;
   isSymlink?: boolean;
+  /**
+   * Set on credential directories such as `.ssh` when the workspace tree is listed.
+   * The Files tab shows the row and refuses to open or change it.
+   */
+  locked?: boolean;
   children?: FileTreeNode[];
 };
 
@@ -1544,6 +1549,49 @@ export type FileTreeServices = {
   }>;
   storeUploadedFiles(input: {
     projectId: string;
+    targetPath: string;
+    relativePaths: string[];
+    requestedFileCount: number;
+    files: FileTreeUploadedFile[];
+  }): Promise<{
+    success: true;
+    files: Array<{ name: string; path: string; size: number; mimeType: string }>;
+    uploadedCount: number;
+    requestedFileCount: number;
+    targetPath: string;
+    message: string;
+  }>;
+  /**
+   * Lists the workspace root for the Files tab's workspace view.
+   * Credential directories are marked `locked` and not descended into.
+   */
+  listWorkspaceFiles(): Promise<FileTreeNode[]>;
+  readWorkspaceTextFile(filePath: string): Promise<{ content: string; path: string }>;
+  openWorkspaceFile(filePath: string): Promise<{ contentType: string; stream: Readable }>;
+  saveWorkspaceTextFile(filePath: string, content: string): Promise<{
+    success: true;
+    path: string;
+    message: string;
+  }>;
+  createWorkspaceEntry(input: {
+    parentPath: string;
+    type: 'file' | 'directory';
+    name: string;
+  }): Promise<{ success: true; path: string; name: string; type: 'file' | 'directory'; message: string }>;
+  renameWorkspaceEntry(input: { oldPath: string; newName: string }): Promise<{
+    success: true;
+    oldPath: string;
+    newPath: string;
+    newName: string;
+    message: string;
+  }>;
+  deleteWorkspaceEntry(input: { targetPath: string }): Promise<{
+    success: true;
+    path: string;
+    type: 'file' | 'directory';
+    message: string;
+  }>;
+  storeWorkspaceUploads(input: {
     targetPath: string;
     relativePaths: string[];
     requestedFileCount: number;

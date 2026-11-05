@@ -1,0 +1,4 @@
+#!/bin/sh
+# Installed over the packaged server binary. mega-exec runs this path when it finds no server, so
+# any mega-* command would otherwise start one inside the agent's sandbox.
+exec /usr/local/bin/agentweb-mega ensure

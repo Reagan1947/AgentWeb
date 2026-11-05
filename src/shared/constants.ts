@@ -1,6 +1,7 @@
 import {
   Bell,
   GitBranch,
+  HardDrive,
   Info,
   KeyRound,
   ListChecks,
@@ -117,6 +118,7 @@ export const SETTINGS_MAIN_TABS: SettingsMainTabMeta[] = [
   { id: 'git', label: 'Git', keywords: 'git github commits', icon: GitBranch },
   { id: 'api', label: 'API Tokens', keywords: 'api tokens auth keys', icon: KeyRound },
   { id: 'nono', label: 'Nono', keywords: 'nono sandbox vault folders secrets', icon: Shield },
+  { id: 'mega', label: 'MEGA', keywords: 'mega megacmd sync restart', icon: HardDrive },
   { id: 'tasks', label: 'Tasks', keywords: 'tasks taskmaster', icon: ListChecks },
   { id: 'browser', label: 'Browser', keywords: 'browser playwright chromium automation', icon: MonitorPlay },
   { id: 'notifications', label: 'Notifications', keywords: 'notifications alerts push', icon: Bell },

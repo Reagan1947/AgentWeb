@@ -55,7 +55,7 @@ export default function CodeEditorMediaPreview({
   const sourceKey = `${projectId ?? ''}:${file.path}:${kind}`;
 
   useEffect(() => {
-    if (!projectId) {
+    if (!projectId && file.fileScope !== 'workspace') {
       setUrl(null);
       setLoadedKey(null);
       setError(labels.error);
@@ -75,7 +75,9 @@ export default function CodeEditorMediaPreview({
         // The content endpoint requires the auth header, so we fetch the bytes
         // ourselves and hand the media element a blob URL instead of a bare src.
         // Fetching a blob (rather than streaming) also lets <video>/<audio> seek.
-        const response = await api.readFileBlob(projectId, file.path, { signal: controller.signal });
+        const response = file.fileScope === 'workspace'
+          ? await api.readWorkspaceFileBlob(file.path, { signal: controller.signal })
+          : await api.readFileBlob(projectId ?? '', file.path, { signal: controller.signal });
 
         if (!response.ok) {
           throw new Error(`Request failed with status ${response.status}`);
@@ -136,7 +138,7 @@ export default function CodeEditorMediaPreview({
         URL.revokeObjectURL(objectUrl);
       }
     };
-  }, [file.path, file.name, projectId, kind, sourceKey, labels.error]);
+  }, [file.fileScope, file.path, file.name, projectId, kind, sourceKey, labels.error]);
 
   // Only expose the blob once it matches the file currently being shown, so a
   // stale URL from the previous file is never rendered during a switch.

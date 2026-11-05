@@ -1,6 +1,6 @@
 import type { DragEvent, ReactNode, RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ChevronRight, Upload } from 'lucide-react';
+import { ChevronRight, Lock, Upload } from 'lucide-react';
 
 import { FolderBoldIcon, FolderNotchOpenBoldIcon, Input } from '@/shared/ui';
 import { cn } from '@/shared/utils';
@@ -51,6 +51,15 @@ function getParentDirectoryPath(itemPath: string) {
 }
 
 function TreeItemIcon({ item, isOpen, renderFileIcon }: TreeItemIconProps) {
+  if (item.locked) {
+    return (
+      <span className="flex flex-shrink-0 items-center gap-0.5">
+        <Lock className="h-4 w-4 text-muted-foreground/70" />
+        <FolderBoldIcon className="h-5 w-5 flex-shrink-0 text-muted-foreground" />
+      </span>
+    );
+  }
+
   if (item.type === 'directory') {
     return (
       <span className="flex flex-shrink-0 items-center gap-0.5">
@@ -102,7 +111,8 @@ export default function FileTreeNode({
 }: FileTreeNodeProps) {
   const { t } = useTranslation();
   const isDirectory = item.type === 'directory';
-  const isOpen = isDirectory && expandedDirs.has(item.path);
+  const isLocked = Boolean(item.locked);
+  const isOpen = isDirectory && !isLocked && expandedDirs.has(item.path);
   const hasChildren = Boolean(isDirectory && item.children && item.children.length > 0);
   const isRenaming = renamingItem?.path === item.path;
   const dragTargetPath = isDirectory ? item.path : getParentDirectoryPath(item.path);
@@ -156,7 +166,7 @@ export default function FileTreeNode({
     );
   }
 
-  const uploadHoverButton = isDirectory && onUpload && (
+  const uploadHoverButton = isDirectory && !isLocked && onUpload && (
     <button
       type="button"
       onClick={(event) => {
@@ -186,7 +196,7 @@ export default function FileTreeNode({
         <>
           <div className="col-span-5 flex min-w-0 items-center gap-1.5">
             <TreeItemIcon item={item} isOpen={isOpen} renderFileIcon={renderFileIcon} />
-            <span className={nameClassName}>{item.name}</span>
+            <span className={nameClassName} title={isLocked ? t('fileTree.lockedCredential', 'Protected credentials') : undefined}>{item.name}</span>
           </div>
           <div className="col-span-2 text-sm tabular-nums text-muted-foreground">
             {item.type === 'file' ? formatFileSize(item.size) : ''}
@@ -198,7 +208,7 @@ export default function FileTreeNode({
         <>
           <div className="flex min-w-0 items-center gap-1.5">
             <TreeItemIcon item={item} isOpen={isOpen} renderFileIcon={renderFileIcon} />
-            <span className={nameClassName}>{item.name}</span>
+            <span className={nameClassName} title={isLocked ? t('fileTree.lockedCredential', 'Protected credentials') : undefined}>{item.name}</span>
           </div>
           <div className="ml-2 flex flex-shrink-0 items-center gap-3 text-sm text-muted-foreground">
             {item.type === 'file' && (
@@ -212,7 +222,7 @@ export default function FileTreeNode({
       ) : (
         <>
           <TreeItemIcon item={item} isOpen={isOpen} renderFileIcon={renderFileIcon} />
-          <span className={nameClassName}>{item.name}</span>
+          <span className={nameClassName} title={isLocked ? t('fileTree.lockedCredential', 'Protected credentials') : undefined}>{item.name}</span>
         </>
       )}
       {uploadHoverButton}
@@ -227,13 +237,13 @@ export default function FileTreeNode({
       {hasContextMenu ? (
         <FileContextMenu
           item={item}
-          onRename={onRename}
-          onDelete={onDelete}
-          onNewFile={onNewFile}
-          onNewFolder={onNewFolder}
-          onUpload={onUpload}
+          onRename={isLocked ? undefined : onRename}
+          onDelete={isLocked ? undefined : onDelete}
+          onNewFile={isLocked ? undefined : onNewFile}
+          onNewFolder={isLocked ? undefined : onNewFolder}
+          onUpload={isLocked ? undefined : onUpload}
           onCopyPath={onCopyPath}
-          onDownload={onDownload}
+          onDownload={isLocked ? undefined : onDownload}
           onRefresh={onRefresh}
         >
           {rowContent}

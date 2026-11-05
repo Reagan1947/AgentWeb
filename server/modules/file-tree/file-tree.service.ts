@@ -20,6 +20,24 @@ const HARD_EXCLUDED_DIRECTORY_NAMES = new Set([
   'node_modules', '.git', '.svn', '.hg',
 ]);
 
+/**
+ * Directory names nono refuses to place under an allowed parent.
+ * The workspace file manager shows them as locked rows and rejects reads and writes.
+ */
+const LOCKED_CREDENTIAL_DIRECTORY_NAMES = new Set([
+  '.ssh',
+  '.aws',
+  '.azure',
+  '.gnupg',
+  '.kube',
+  '.docker',
+  '.config',
+  '.local',
+  '.1password',
+  '.password-store',
+  '.secrets',
+]);
+
 const IGNORED_DIRECTORY_NAMES = new Set([
   ...HARD_EXCLUDED_DIRECTORY_NAMES,
   'dist', 'build', '.next', '.nuxt', '.cache', '.parcel-cache',
@@ -104,6 +122,25 @@ function resolvePathInsideProject(projectRoot: string, targetPath: string): stri
   }
 
   return resolvedPath;
+}
+
+/** True when any segment of `resolvedPath` under `root` is a credential directory. */
+function pathContainsLockedCredential(root: string, resolvedPath: string): boolean {
+  const relative = path.relative(path.resolve(root), path.resolve(resolvedPath));
+  if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) {
+    return false;
+  }
+  return relative.split(path.sep).some((segment) => LOCKED_CREDENTIAL_DIRECTORY_NAMES.has(segment));
+}
+
+function assertCredentialPathUnlocked(root: string, resolvedPath: string): void {
+  if (pathContainsLockedCredential(root, resolvedPath)) {
+    throw createFileTreeError(
+      'This folder contains protected credentials and cannot be opened or changed.',
+      403,
+      'LOCKED_CREDENTIAL_PATH',
+    );
+  }
 }
 
 function expandWorkspacePath(workspaceRoot: string, inputPath: string): string {
@@ -193,6 +230,38 @@ export function createFileTreeService(dependencies: FileTreeServiceDependencies)
     return projectRoot;
   }
 
+  /** The configured workspace root after the same policy used for project registration. */
+  async function resolveWorkspaceRoot(): Promise<string> {
+    const validation = await dependencies.workspace.validatePath(dependencies.workspace.rootPath);
+    if (!validation.valid || !validation.resolvedPath) {
+      throw createFileTreeError(
+        validation.error ?? 'Workspace root is not available',
+        403,
+        'INVALID_WORKSPACE_PATH',
+      );
+    }
+    return validation.resolvedPath;
+  }
+
+  /**
+   * Resolves a file or directory the operator may change under the workspace root.
+   * Credential directories stay visible in the tree and are rejected here.
+   */
+  async function resolveWorkspaceWritePath(targetPath: string): Promise<{ root: string; resolvedPath: string }> {
+    const root = await resolveWorkspaceRoot();
+    const resolvedPath = resolvePathInsideProject(root, targetPath);
+    const validation = await dependencies.workspace.validatePath(resolvedPath);
+    if (!validation.valid || !validation.resolvedPath) {
+      throw createFileTreeError(
+        validation.error ?? 'Path is outside the workspace root',
+        403,
+        'INVALID_WORKSPACE_PATH',
+      );
+    }
+    assertCredentialPathUnlocked(root, validation.resolvedPath);
+    return { root, resolvedPath: validation.resolvedPath };
+  }
+
   /**
    * Streams one directory and keeps only the entries the tree will show.
    *
@@ -251,6 +320,7 @@ export function createFileTreeService(dependencies: FileTreeServiceDependencies)
     currentDepth = 0,
     includeEntry: FileTreeEntryFilter = includeEntryByFallbackDirectoryNames,
     remainingEntries = { value: MAXIMUM_FILE_TREE_ENTRIES },
+    lockCredentials = false,
   ): Promise<FileTreeNode[]> {
     const visibleEntries = await collectVisibleEntries(directoryPath, includeEntry, remainingEntries);
 
@@ -295,14 +365,19 @@ export function createFileTreeService(dependencies: FileTreeServiceDependencies)
       // and /proc in particular can contain thousands of virtual entries
       // that make traversal from a broad root (e.g. "/") pathologically slow.
       const isForbiddenSystemDir = FORBIDDEN_WORKSPACE_PATHS.includes(normalizeProjectPath(itemPath));
+      const credentialLocked = lockCredentials && LOCKED_CREDENTIAL_DIRECTORY_NAMES.has(entry.name);
+      if (credentialLocked) {
+        item.locked = true;
+      }
 
-      if (entry.isDirectory() && currentDepth < maximumDepth && !isForbiddenSystemDir) {
+      if (entry.isDirectory() && currentDepth < maximumDepth && !isForbiddenSystemDir && !credentialLocked) {
         item.children = await buildFileTree(
           itemPath,
           maximumDepth,
           currentDepth + 1,
           includeEntry,
           remainingEntries,
+          lockCredentials,
         );
       }
 
@@ -724,6 +799,239 @@ export function createFileTreeService(dependencies: FileTreeServiceDependencies)
         }
         if (error instanceof AppError) throw error;
         dependencies.logger.error(`Error uploading files: ${readErrorMessage(error)}`, error);
+        throw error;
+      }
+    },
+
+    async listWorkspaceFiles() {
+      const workspaceRoot = await resolveWorkspaceRoot();
+      try {
+        await fileSystem.access(workspaceRoot);
+      } catch {
+        throw createFileTreeError(`Workspace path not found: ${workspaceRoot}`, 404, 'WORKSPACE_PATH_NOT_FOUND');
+      }
+
+      try {
+        return await buildFileTree(
+          workspaceRoot,
+          10,
+          0,
+          includeEntryByFallbackDirectoryNames,
+          { value: MAXIMUM_FILE_TREE_ENTRIES },
+          true,
+        );
+      } catch (error) {
+        if (error instanceof AppError && error.code === 'FILE_TREE_TOO_LARGE') {
+          throw createFileTreeError(
+            `Workspace file tree exceeds the ${MAXIMUM_FILE_TREE_ENTRIES.toLocaleString()} entry limit.`,
+            413,
+            'FILE_TREE_TOO_LARGE',
+          );
+        }
+        throw error;
+      }
+    },
+
+    async readWorkspaceTextFile(filePath) {
+      const { resolvedPath } = await resolveWorkspaceWritePath(filePath);
+      try {
+        const content = await fileSystem.readTextFile(resolvedPath);
+        return { content, path: resolvedPath };
+      } catch (error) {
+        mapFileSystemError(error, {
+          ENOENT: { message: 'File not found', statusCode: 404 },
+          EACCES: { message: 'Permission denied', statusCode: 403 },
+          EISDIR: { message: 'Path is a directory, not a file', statusCode: 400 },
+        });
+      }
+    },
+
+    async openWorkspaceFile(filePath) {
+      const { resolvedPath } = await resolveWorkspaceWritePath(filePath);
+      try {
+        await fileSystem.access(resolvedPath);
+      } catch {
+        throw createFileTreeError('File not found', 404, 'FILE_NOT_FOUND');
+      }
+      return {
+        contentType: dependencies.resolveMimeType(resolvedPath),
+        stream: fileSystem.createReadStream(resolvedPath),
+      };
+    },
+
+    async saveWorkspaceTextFile(filePath, content) {
+      const { resolvedPath } = await resolveWorkspaceWritePath(filePath);
+      try {
+        await fileSystem.writeTextFile(resolvedPath, content);
+      } catch (error) {
+        mapFileSystemError(error, {
+          ENOENT: { message: 'File or directory not found', statusCode: 404 },
+          EACCES: { message: 'Permission denied', statusCode: 403 },
+        });
+      }
+      return { success: true as const, path: resolvedPath, message: 'File saved successfully' };
+    },
+
+    async createWorkspaceEntry(input) {
+      validateFilename(input.name);
+      const targetPath = input.parentPath
+        ? path.join(input.parentPath, input.name)
+        : input.name;
+      const { resolvedPath } = await resolveWorkspaceWritePath(targetPath);
+
+      try {
+        await fileSystem.access(resolvedPath);
+        throw createFileTreeError(
+          `${input.type === 'file' ? 'File' : 'Directory'} already exists`,
+          409,
+          'FILE_TREE_ENTRY_EXISTS',
+        );
+      } catch (error) {
+        if (error instanceof AppError) throw error;
+      }
+
+      try {
+        if (input.type === 'directory') {
+          await fileSystem.makeDirectory(resolvedPath, false);
+        } else {
+          await fileSystem.writeTextFile(resolvedPath, '');
+        }
+      } catch (error) {
+        mapFileSystemError(error, {
+          EACCES: { message: 'Permission denied', statusCode: 403 },
+          ENOENT: { message: 'Parent directory not found', statusCode: 404 },
+        });
+      }
+
+      return {
+        success: true as const,
+        path: resolvedPath,
+        name: input.name,
+        type: input.type,
+        message: 'Created successfully',
+      };
+    },
+
+    async renameWorkspaceEntry(input) {
+      validateFilename(input.newName);
+      const { root, resolvedPath: resolvedOldPath } = await resolveWorkspaceWritePath(input.oldPath);
+      try {
+        await fileSystem.lstat(resolvedOldPath);
+      } catch {
+        throw createFileTreeError('File or directory not found', 404, 'FILE_TREE_ENTRY_NOT_FOUND');
+      }
+      const resolvedNewPath = path.join(path.dirname(resolvedOldPath), input.newName);
+      assertCredentialPathUnlocked(root, resolvedNewPath);
+      resolvePathInsideProject(root, resolvedNewPath);
+      try {
+        await fileSystem.access(resolvedNewPath);
+        throw createFileTreeError('A file or directory with that name already exists', 409, 'FILE_TREE_ENTRY_EXISTS');
+      } catch (error) {
+        if (error instanceof AppError) throw error;
+      }
+      await fileSystem.rename(resolvedOldPath, resolvedNewPath);
+      return {
+        success: true as const,
+        oldPath: resolvedOldPath,
+        newPath: resolvedNewPath,
+        newName: input.newName,
+        message: 'Renamed successfully',
+      };
+    },
+
+    async deleteWorkspaceEntry(input) {
+      const { root, resolvedPath } = await resolveWorkspaceWritePath(input.targetPath);
+      if (resolvedPath === path.resolve(root)) {
+        throw createFileTreeError('Cannot delete the workspace root', 403, 'PROJECT_ROOT_DELETE_FORBIDDEN');
+      }
+      let stats;
+      try {
+        stats = await fileSystem.lstat(resolvedPath);
+      } catch {
+        throw createFileTreeError('File or directory not found', 404, 'FILE_TREE_ENTRY_NOT_FOUND');
+      }
+      try {
+        if (stats.isDirectory()) {
+          await fileSystem.removeDirectory(resolvedPath);
+        } else {
+          await fileSystem.unlink(resolvedPath);
+        }
+      } catch (error) {
+        mapFileSystemError(error, {
+          EACCES: { message: 'Permission denied', statusCode: 403 },
+          ENOENT: { message: 'File or directory not found', statusCode: 404 },
+          ENOTEMPTY: { message: 'Directory is not empty', statusCode: 400 },
+        });
+      }
+      return {
+        success: true as const,
+        path: resolvedPath,
+        type: stats.isDirectory() ? 'directory' as const : 'file' as const,
+        message: 'Deleted successfully',
+      };
+    },
+
+    async storeWorkspaceUploads(input) {
+      if (input.files.length === 0) {
+        throw createFileTreeError('No files provided', 400, 'UPLOAD_FILES_REQUIRED');
+      }
+      const root = await resolveWorkspaceRoot();
+      try {
+        const resolvedTargetDirectory = !input.targetPath
+          || input.targetPath === '.'
+          || input.targetPath === './'
+          ? root
+          : (await resolveWorkspaceWritePath(input.targetPath)).resolvedPath;
+        assertCredentialPathUnlocked(root, resolvedTargetDirectory);
+
+        try {
+          await fileSystem.access(resolvedTargetDirectory);
+        } catch {
+          await fileSystem.makeDirectory(resolvedTargetDirectory, true);
+        }
+
+        const uploadedFiles: Array<{ name: string; path: string; size: number; mimeType: string }> = [];
+        for (let fileIndex = 0; fileIndex < input.files.length; fileIndex += 1) {
+          const file = input.files[fileIndex];
+          const fileName = input.relativePaths[fileIndex] || file.originalName;
+          const destinationPath = path.join(resolvedTargetDirectory, fileName);
+          try {
+            assertCredentialPathUnlocked(root, destinationPath);
+            resolvePathInsideProject(root, destinationPath);
+          } catch (error) {
+            if (error instanceof AppError && error.statusCode === 403) {
+              await cleanupTemporaryFiles([file]);
+              continue;
+            }
+            throw error;
+          }
+          const parentDirectory = path.dirname(destinationPath);
+          try {
+            await fileSystem.access(parentDirectory);
+          } catch {
+            await fileSystem.makeDirectory(parentDirectory, true);
+          }
+          await fileSystem.copyFile(file.temporaryPath, destinationPath);
+          await fileSystem.unlink(file.temporaryPath);
+          uploadedFiles.push({
+            name: fileName,
+            path: destinationPath,
+            size: file.size,
+            mimeType: file.mimeType,
+          });
+        }
+
+        return {
+          success: true as const,
+          files: uploadedFiles,
+          uploadedCount: uploadedFiles.length,
+          requestedFileCount: input.requestedFileCount,
+          targetPath: resolvedTargetDirectory,
+          message: `Uploaded ${uploadedFiles.length} ${uploadedFiles.length === 1 ? 'file' : 'files'} successfully`,
+        };
+      } catch (error) {
+        await cleanupTemporaryFiles(input.files);
+        if (error instanceof AppError) throw error;
         throw error;
       }
     },

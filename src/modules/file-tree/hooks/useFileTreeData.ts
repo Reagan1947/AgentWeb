@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { api } from '@/shared/api';
-import type { Project,FileTreeNode } from '@/shared/types';
+import type { FileTreeNode, FileTreeScope, Project } from '@/shared/types';
 
 type UseFileTreeDataResult = {
   files: FileTreeNode[];
@@ -27,7 +27,10 @@ function readResponseErrorMessage(responseBody: string): string | null {
   }
 }
 
-export function useFileTreeData(selectedProject: Project | null): UseFileTreeDataResult {
+export function useFileTreeData(
+  selectedProject: Project | null,
+  scope: FileTreeScope = 'project',
+): UseFileTreeDataResult {
   const [files, setFiles] = useState<FileTreeNode[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,8 +45,9 @@ export function useFileTreeData(selectedProject: Project | null): UseFileTreeDat
     // File-tree requests use the DB projectId; the backend resolves it to the
     // project's absolute path through the projects table.
     const projectId = selectedProject?.projectId;
+    const workspaceScope = scope === 'workspace';
 
-    if (!projectId) {
+    if (!workspaceScope && !projectId) {
       setFiles([]);
       setLoading(false);
       setError(null);
@@ -65,7 +69,9 @@ export function useFileTreeData(selectedProject: Project | null): UseFileTreeDat
         setError(null);
       }
       try {
-        const response = await api.getFiles(projectId, { signal: abortControllerRef.current!.signal });
+        const response = workspaceScope
+          ? await api.getWorkspaceFiles({ signal: abortControllerRef.current!.signal })
+          : await api.getFiles(projectId!, { signal: abortControllerRef.current!.signal });
 
         if (!response.ok) {
           const errorText = await response.text();
@@ -104,7 +110,7 @@ export function useFileTreeData(selectedProject: Project | null): UseFileTreeDat
       isActive = false;
       abortControllerRef.current?.abort();
     };
-  }, [selectedProject?.projectId, refreshKey]);
+  }, [scope, selectedProject?.projectId, refreshKey]);
 
   return {
     files,

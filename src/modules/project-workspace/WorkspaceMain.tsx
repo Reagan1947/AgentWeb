@@ -190,7 +190,9 @@ function WorkspaceMain({
             <div className="h-full overflow-hidden">
               <FileTree
                 selectedProject={selectedProject}
-                onFileOpen={handleFileOpen}
+                onFileOpen={(filePath, scope) => {
+                  handleFileOpen(filePath, null, null, scope ?? 'project');
+                }}
                 revealDirectory={revealDirectory}
               />
             </div>
@@ -202,6 +204,7 @@ function WorkspaceMain({
                 project={selectedProject}
                 session={selectedSession}
                 showHeader={false}
+                allowOperatorShell
                 isActive={activeTab === 'shell'}
               />
             </div>

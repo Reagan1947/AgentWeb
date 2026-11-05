@@ -1,4 +1,4 @@
-import { Bell, GitBranch, Info, Key, ListChecks, Mic, MonitorPlay, Palette, Puzzle, Shield, Terminal } from 'lucide-react';
+import { Bell, GitBranch, HardDrive, Info, Key, ListChecks, Mic, MonitorPlay, Palette, Puzzle, Shield, Terminal } from 'lucide-react';
 import type { ComponentType } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -24,6 +24,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'git', labelKey: 'mainTabs.git', icon: GitBranch },
   { id: 'api', labelKey: 'mainTabs.apiTokens', icon: Key },
   { id: 'nono', labelKey: 'mainTabs.nono', icon: Shield },
+  { id: 'mega', labelKey: 'mainTabs.mega', icon: HardDrive },
   { id: 'voice', labelKey: 'mainTabs.voice', icon: Mic },
   { id: 'tasks', labelKey: 'mainTabs.tasks', icon: ListChecks },
   { id: 'browser', labelKey: 'mainTabs.browser', icon: MonitorPlay },

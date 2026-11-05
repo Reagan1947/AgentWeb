@@ -190,6 +190,9 @@ export const sessionMessagesUrl = (
 const fileContentPath = (projectId: string, filePath: string) =>
   `/api/file-tree/projects/${projectId}/files/content${query({ path: filePath })}`;
 
+const workspaceFileContentPath = (filePath: string) =>
+  `/api/file-tree/workspace/files/content${query({ path: filePath })}`;
+
 const pluginAssetPath = (pluginName: string, assetFile: string) =>
   `/api/plugins/${encodeURIComponent(pluginName)}/assets/${encodeURIComponent(assetFile)}`;
 
@@ -330,6 +333,23 @@ export const api = {
   // Uploads with a progress bar go through XMLHttpRequest, which needs the URL.
   uploadFilesUrl: (projectId: string) =>
     `/api/file-tree/projects/${encodeURIComponent(projectId)}/files/upload`,
+
+  getWorkspaceFiles: (options: ApiRequestOptions = {}) =>
+    get('/api/file-tree/workspace/files', options),
+  readWorkspaceFile: (filePath: string) =>
+    get(`/api/file-tree/workspace/file${query({ filePath })}`),
+  readWorkspaceFileBlob: (filePath: string, options: ApiRequestOptions = {}) =>
+    get(workspaceFileContentPath(filePath), options),
+  saveWorkspaceFile: (filePath: string, content: string) =>
+    put('/api/file-tree/workspace/file', { filePath, content }),
+  createWorkspaceFile: (
+    { path, type, name }: { path: string; type: string; name: string },
+  ) => post('/api/file-tree/workspace/files/create', { path, type, name }),
+  renameWorkspaceFile: ({ oldPath, newName }: { oldPath: string; newName: string }) =>
+    put('/api/file-tree/workspace/files/rename', { oldPath, newName }),
+  deleteWorkspaceFile: ({ path, type }: { path: string; type: string }) =>
+    del('/api/file-tree/workspace/files', { path, type }),
+  uploadWorkspaceFilesUrl: () => '/api/file-tree/workspace/files/upload',
 
   // Browse filesystem for project suggestions
   browseFilesystem: (dirPath: string | null = null) =>
@@ -571,6 +591,8 @@ export const api = {
       patch(`/api/settings/credentials/${credentialId}/toggle`, { isActive }),
 
     nono: () => get('/api/settings/nono'),
+    megaStatus: () => get('/api/mega-control/status'),
+    megaRestart: () => post('/api/mega-control/restart', {}),
     saveNono: (settings: { enabled: boolean; allowedFolders: string[] }) =>
       put('/api/settings/nono', settings),
 

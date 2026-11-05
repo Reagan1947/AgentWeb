@@ -80,7 +80,7 @@ npm run desktop:dist:win   # 构建 Windows 安装包
 
 ### Docker
 
-在一台 Linux 机器上同时运行 AgentWeb、nono、Claude CLI 和 Steel。需要 Docker 和 Compose 2.24 或更高版本，内核要启用 Landlock（nono 的网络规则需要 6.7 或更高）。
+在一台 Linux 机器上同时运行 AgentWeb、nono、各代理 CLI 和 Steel。需要 Docker 和 Compose 2.24 或更高版本，内核要启用 Landlock（nono 的网络规则需要 6.7 或更高）。
 
 ```bash
 git clone https://github.com/Reagan1947/AgentWeb.git
@@ -103,7 +103,7 @@ docker compose up -d --build
 | `AGENT_UID` | `1000` | 容器用户的 ID，需要对 `WORKSPACE_DIR` 有写权限。 |
 | `OPTIONAL_TOOLS` | 空 | 构建进镜像的额外工具：`jdk8`、`jdk17`。 |
 
-镜像预装了常用开发工具，因为代理自己无法安装系统软件：`gh`、`pnpm`、`bun`、`uv`、Python 的 `pip` 和 `venv`、Go、数据库客户端和 MEGAcmd。要加入 JDK 8 或 17（附带 Maven），在 `.env` 里设置 `OPTIONAL_TOOLS=jdk8,jdk17`。此时默认使用 JDK 17，把 `JAVA_HOME` 指向 `$JDK8_HOME` 即可切换。要加其他工具，修改 `docker/extra-tools.sh`。改完都需要重新构建。
+镜像预装了 AgentWeb 会启动的代理 CLI：Claude Code、Codex（`codex`）、Cursor（`cursor-agent`）和 OpenCode 1（`opencode`）。同时也预装了常用开发工具，因为代理自己无法安装系统软件：`gh`、`pnpm`、`bun`、`uv`、Python 的 `pip` 和 `venv`、Go、数据库客户端和 MEGAcmd。要加入 JDK 8 或 17（附带 Maven），在 `.env` 里设置 `OPTIONAL_TOOLS=jdk8,jdk17`。此时默认使用 JDK 17，把 `JAVA_HOME` 指向 `$JDK8_HOME` 即可切换。要加其他工具，修改 `docker/extra-tools.sh`。改完都需要重新构建。
 
 Steel 和 AgentWeb 容器共用网络，所以它的 Chrome 能打开代理启动的开发服务。代理不能占用 3000 和 9223 端口。Steel 从固定的提交构建，因为它只发布 `latest` 镜像，而紧接着的下一个提交会破坏实时画面。要更换版本，修改 `STEEL_REF`。账号、Claude 登录状态和设置都保存在 `agent-home` 卷里。
 

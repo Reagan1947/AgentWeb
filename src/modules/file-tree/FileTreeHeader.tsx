@@ -6,9 +6,11 @@ import { useTranslation } from 'react-i18next';
 import { Button, Input } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 import { MAX_FILE_UPLOAD_SIZE_LABEL, WORKSPACE_PANE_ICON_ACTION_CLASS, WORKSPACE_PANE_TOOLBAR_CHROME_CLASS } from '@/shared/constants';
-import type { FileTreeViewMode } from '@/shared/types';
+import type { FileTreeScope, FileTreeViewMode } from '@/shared/types';
 
 type FileTreeHeaderProps = {
+  scope: FileTreeScope;
+  onScopeChange: (scope: FileTreeScope) => void;
   viewMode: FileTreeViewMode;
   onViewModeChange: (mode: FileTreeViewMode) => void;
   searchQuery: string;
@@ -26,8 +28,10 @@ type FileTreeHeaderProps = {
   uploadProgress?: number | null;
 };
 
-/** Rendered by FileTree to host the search box, view-mode switch and the create/upload/refresh/collapse actions. */
+/** Rendered by FileTree to host the project/workspace scope switch, search box, view-mode switch and the create/upload/refresh/collapse actions. */
 export default function FileTreeHeader({
+  scope,
+  onScopeChange,
   viewMode,
   onViewModeChange,
   searchQuery,
@@ -55,7 +59,25 @@ export default function FileTreeHeader({
 
   return (
     <div className={cn('space-y-2', WORKSPACE_PANE_TOOLBAR_CHROME_CLASS)}>
-      <div className="flex items-center">
+      <div className="flex items-center gap-2">
+        <div className="flex items-center rounded-md border border-border p-0.5" role="group" aria-label={t('fileTree.scopeLabel', 'File scope')}>
+          {(['project', 'workspace'] as const).map((option) => (
+            <button
+              key={option}
+              type="button"
+              aria-pressed={scope === option}
+              className={cn(
+                'rounded px-2 py-0.5 text-xs',
+                scope === option ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground',
+              )}
+              onClick={() => onScopeChange(option)}
+            >
+              {option === 'project'
+                ? t('fileTree.scopeProject', 'This project')
+                : t('fileTree.scopeWorkspace', 'Workspace')}
+            </button>
+          ))}
+        </div>
         <div className="flex items-center gap-1">
           {/* Action buttons */}
           {onUploadFiles && (

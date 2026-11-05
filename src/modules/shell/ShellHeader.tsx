@@ -1,10 +1,15 @@
 import { Palette, RotateCcw, Shield, ShieldOff, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 import { WORKSPACE_PANE_ACTION_CLASS, WORKSPACE_PANE_TOOLBAR_CHROME_CLASS } from '@/shared/constants';
 
 type ShellHeaderProps = {
+  showModeToggle?: boolean;
+  shellMode?: 'agent' | 'terminal';
+  onShellModeChange?: (mode: 'agent' | 'terminal') => void;
+  operatorHint?: string | null;
   isConnected: boolean;
   isInitialized: boolean;
   isRestarting: boolean;
@@ -28,6 +33,10 @@ type ShellHeaderProps = {
 
 /** Rendered by Shell above the terminal. The session name used to sit here; the disconnect and restart actions take that spot. */
 export default function ShellHeader({
+  showModeToggle = false,
+  shellMode = 'agent',
+  onShellModeChange,
+  operatorHint = null,
   isConnected,
   isInitialized,
   isRestarting,
@@ -48,9 +57,28 @@ export default function ShellHeader({
   bypassLabel,
   bypassTitle,
 }: ShellHeaderProps) {
+  const { t } = useTranslation('chat');
   return (
     <div className={cn('flex-shrink-0', WORKSPACE_PANE_TOOLBAR_CHROME_CLASS)}>
       <div className="flex min-w-0 flex-wrap items-center gap-1">
+        {showModeToggle && (
+            <div className="mr-1 flex items-center rounded-md border border-border p-0.5" role="group" aria-label={t('shell.modeLabel', 'Shell mode')}>
+            {(['agent', 'terminal'] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                aria-pressed={shellMode === mode}
+                className={cn(
+                  'rounded px-2 py-0.5 text-xs',
+                  shellMode === mode ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground',
+                )}
+                onClick={() => onShellModeChange?.(mode)}
+              >
+                {mode === 'agent' ? t('shell.modeAgent', 'Agent') : t('shell.modeTerminal', 'Terminal')}
+              </button>
+            ))}
+          </div>
+        )}
         {showBypassToggle && (
           <Button
             type="button"
@@ -106,6 +134,9 @@ export default function ShellHeader({
       </div>
 
       {/* A running Claude CLI keeps the theme it was launched in; Restart applies the new one. */}
+      {operatorHint && (
+        <p role="status" className="mt-1.5 text-xs text-muted-foreground">{operatorHint}</p>
+      )}
       {showThemeRestartHint && (
         <p role="status" className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
           <Palette className="h-3.5 w-3.5 flex-shrink-0" aria-hidden="true" />

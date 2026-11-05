@@ -210,7 +210,77 @@ export function createFileTreeRouter(
     }));
   }, logger));
 
-  const uploadHandler = createRouteHandler(async (request, response) => {
+  router.get('/workspace/files', createRouteHandler(async (_request, response) => {
+    response.json(await services.listWorkspaceFiles());
+  }, logger));
+
+  router.get('/workspace/file', createRouteHandler(async (request, response) => {
+    const filePath = readRequiredString(request.query.filePath, 'filePath', 'Invalid file path');
+    response.json(await services.readWorkspaceTextFile(filePath));
+  }, logger));
+
+  router.get('/workspace/files/content', createRouteHandler(async (request, response) => {
+    const filePath = readRequiredString(request.query.path, 'path', 'Invalid file path');
+    const file = await services.openWorkspaceFile(filePath);
+    response.setHeader('Content-Type', file.contentType);
+    file.stream.pipe(response);
+    file.stream.on('error', (error) => {
+      logger.error('Error streaming workspace File Tree content', error);
+      if (!response.headersSent) {
+        response.status(500).json({ error: 'Error reading file' });
+      }
+    });
+  }, logger));
+
+  router.put('/workspace/file', createRouteHandler(async (request, response) => {
+    const body = readBody(request);
+    const filePath = readRequiredString(body.filePath, 'filePath', 'Invalid file path');
+    if (typeof body.content !== 'string') {
+      throw new AppError('Content must be a string', {
+        code: 'INVALID_FILE_CONTENT',
+        statusCode: 400,
+      });
+    }
+    response.json(await services.saveWorkspaceTextFile(filePath, body.content));
+  }, logger));
+
+  router.post('/workspace/files/create', createRouteHandler(async (request, response) => {
+    const body = readBody(request);
+    if (!body.name || !body.type) {
+      throw new AppError('Name and type are required', {
+        code: 'FILE_TREE_ENTRY_FIELDS_REQUIRED',
+        statusCode: 400,
+      });
+    }
+    response.json(await services.createWorkspaceEntry({
+      parentPath: readOptionalString(body.path) ?? '',
+      type: readEntryType(body.type),
+      name: readRequiredString(body.name, 'name'),
+    }));
+  }, logger));
+
+  router.put('/workspace/files/rename', createRouteHandler(async (request, response) => {
+    const body = readBody(request);
+    if (!body.oldPath || !body.newName) {
+      throw new AppError('oldPath and newName are required', {
+        code: 'FILE_TREE_RENAME_FIELDS_REQUIRED',
+        statusCode: 400,
+      });
+    }
+    response.json(await services.renameWorkspaceEntry({
+      oldPath: readRequiredString(body.oldPath, 'oldPath'),
+      newName: readRequiredString(body.newName, 'newName'),
+    }));
+  }, logger));
+
+  router.delete('/workspace/files', createRouteHandler(async (request, response) => {
+    const body = readBody(request);
+    response.json(await services.deleteWorkspaceEntry({
+      targetPath: readRequiredString(body.path, 'path', 'Path is required'),
+    }));
+  }, logger));
+
+  const uploadProjectHandler = createRouteHandler(async (request, response) => {
     const uploadedRequest = request as UploadedRequest;
     const body = readBody(request);
     const files = normalizeUploadedFiles(uploadedRequest);
@@ -223,14 +293,28 @@ export function createFileTreeRouter(
     }));
   }, logger);
 
-  router.post(
-    '/projects/:projectId/files/upload',
-    (request: Request, response: Response, next: NextFunction) => {
-      uploadFilesMiddleware(request, response, (error?: unknown) => {
-        if (!error) {
-          void uploadHandler(request, response, next);
-          return;
-        }
+  const uploadWorkspaceHandler = createRouteHandler(async (request, response) => {
+    const uploadedRequest = request as UploadedRequest;
+    const body = readBody(request);
+    const files = normalizeUploadedFiles(uploadedRequest);
+    response.json(await services.storeWorkspaceUploads({
+      targetPath: readOptionalString(body.targetPath) ?? '',
+      relativePaths: readRelativePaths(body.relativePaths),
+      requestedFileCount: readRequestedFileCount(body.requestedFileCount, files.length),
+      files,
+    }));
+  }, logger);
+
+  const acceptUpload = (handler: RequestHandler) => (
+    request: Request,
+    response: Response,
+    next: NextFunction,
+  ) => {
+    uploadFilesMiddleware(request, response, (error?: unknown) => {
+      if (!error) {
+        void handler(request, response, next);
+        return;
+      }
 
         const errorCode = typeof error === 'object' && error !== null && 'code' in error
           ? String(error.code)
@@ -251,8 +335,10 @@ export function createFileTreeRouter(
         const message = error instanceof Error ? error.message : String(error);
         response.status(500).json({ error: message });
       });
-    },
-  );
+  };
+
+  router.post('/projects/:projectId/files/upload', acceptUpload(uploadProjectHandler));
+  router.post('/workspace/files/upload', acceptUpload(uploadWorkspaceHandler));
 
   return router;
 }

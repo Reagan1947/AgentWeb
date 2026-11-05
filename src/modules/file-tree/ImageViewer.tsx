@@ -26,9 +26,11 @@ export default function ImageViewer({ file, onClose }: ImageViewerProps) {
         setError(null);
         setImageUrl(null);
 
-        const response = await api.readFileBlob(file.projectId, file.path, {
-          signal: controller.signal,
-        });
+        const response = file.scope === 'workspace'
+          ? await api.readWorkspaceFileBlob(file.path, { signal: controller.signal })
+          : await api.readFileBlob(file.projectId, file.path, {
+            signal: controller.signal,
+          });
 
         if (!response.ok) {
           throw new Error(`Request failed with status ${response.status}`);
@@ -56,7 +58,7 @@ export default function ImageViewer({ file, onClose }: ImageViewerProps) {
         URL.revokeObjectURL(objectUrl);
       }
     };
-  }, [file.projectId, file.path]);
+  }, [file.projectId, file.path, file.scope]);
 
   return (
     <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center">

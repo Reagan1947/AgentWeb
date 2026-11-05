@@ -259,7 +259,12 @@
     "resumeSession": "Resume session: {{displayName}}...",
     "runCommand": "Run {{command}} in {{projectName}}",
     "startCli": "Starting Claude CLI in {{projectName}}",
-    "defaultCommand": "command"
+    "defaultCommand": "command",
+    "modeLabel": "Shell mode",
+    "modeAgent": "Agent",
+    "modeTerminal": "Terminal",
+    "operatorReady": "Operator terminal. This shell does not run inside nono.",
+    "operatorHint": "This terminal does not run inside nono."
   },
   "claudeStatus": {
     "actions": {

@@ -1,4 +1,4 @@
-# AgentWeb with nono and the Claude CLI. Steel runs next to it: see docker-compose.yml.
+# AgentWeb with nono and the agent CLIs. Steel runs next to it: see docker-compose.yml.
 FROM node:22-bookworm-slim AS build
 RUN apt-get update \
   && apt-get install -y --no-install-recommends build-essential python3 python3-setuptools git ca-certificates \
@@ -30,6 +30,18 @@ RUN set -e; arch="${TARGETARCH:-$(dpkg --print-architecture)}"; cd /tmp; \
 RUN npm install -g --no-audit --no-fund "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"
 COPY docker/extra-tools.sh /tmp/extra-tools.sh
 RUN bash /tmp/extra-tools.sh "$OPTIONAL_TOOLS" && rm -f /tmp/extra-tools.sh
+# Declared here so a version change does not rebuild the system packages above.
+ARG CODEX_VERSION=latest
+ARG OPENCODE_VERSION=latest
+COPY docker/install-agent-clis.sh /tmp/install-agent-clis.sh
+RUN bash /tmp/install-agent-clis.sh "$CODEX_VERSION" "$OPENCODE_VERSION" && rm -f /tmp/install-agent-clis.sh
+# mega-exec starts a server by running /usr/bin/mega-cmd-server. Keep the real binary aside and
+# put the helper there, so an agent cannot start MEGAcmd inside its own sandbox.
+COPY docker/mega/agentweb-mega /usr/local/bin/agentweb-mega
+COPY docker/mega/mega-cmd-server /usr/bin/mega-cmd-server.wrapper
+RUN chmod 755 /usr/local/bin/agentweb-mega /usr/bin/mega-cmd-server.wrapper \
+  && mv /usr/bin/mega-cmd-server /usr/bin/mega-cmd-server.real \
+  && mv /usr/bin/mega-cmd-server.wrapper /usr/bin/mega-cmd-server
 # The node image already owns UID 1000 as `node`, so reuse or create the account.
 RUN if ! getent passwd "$AGENT_UID" >/dev/null; then useradd -m -u "$AGENT_UID" -s /bin/bash agent; \
     else usermod -l agent -d /home/agent -m "$(getent passwd "$AGENT_UID" | cut -d: -f1)"; fi \

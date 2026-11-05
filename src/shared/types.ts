@@ -945,6 +945,8 @@ export type CodeEditorFile = {
   // DB projectId; used by the editor to build `/api/file-tree/projects/:projectId/file`
   // URLs for reading and saving content.
   projectId?: string;
+  // `workspace` reads and saves through the workspace file API, outside the open project.
+  fileScope?: 'project' | 'workspace';
   diffInfo?: CodeEditorDiffInfo | null;
   // 1-based line to reveal when the file opens (from a `path:line` reference).
   line?: number | null;
@@ -984,6 +986,9 @@ export type DirectoryRevealRequest = {
   path: string;
 };
 
+/** Files tab root. `project` is the open project. `workspace` is the server workspace root and is not limited by nono. */
+export type FileTreeScope = 'project' | 'workspace';
+
 /** One file or directory entry in a project's file listing, with directories carrying their loaded `children`; used across the file tree for rendering, searching and filtering. */
 export type FileTreeNode = {
   name: string;
@@ -992,6 +997,8 @@ export type FileTreeNode = {
   size?: number;
   modified?: string;
   permissionsRwx?: string;
+  // Credential directory shown in the workspace tree. The row stays visible and cannot be opened or changed.
+  locked?: boolean;
   children?: FileTreeNode[];
   [key: string]: unknown;
 };
@@ -1003,6 +1010,8 @@ export type FileTreeImageSelection = {
   projectPath?: string;
   // DB projectId; used by ImageViewer to build the raw content URL.
   projectId: string;
+  // `workspace` loads the image from the workspace content endpoint.
+  scope?: FileTreeScope;
 };
 
 
@@ -1428,7 +1437,7 @@ export type AgentContext = {
 };
 
 /** Identifier of a top-level section in the settings dialog; use it whenever a tab is stored, compared or requested so deep links, the sidebar and the command palette all agree on the same set of names. */
-export type SettingsMainTab = 'agents' | 'appearance' | 'commands' | 'git' | 'api' | 'nono' | 'voice' | 'tasks' | 'browser' | 'notifications' | 'plugins' | 'about';
+export type SettingsMainTab = 'agents' | 'appearance' | 'commands' | 'git' | 'api' | 'nono' | 'mega' | 'voice' | 'tasks' | 'browser' | 'notifications' | 'plugins' | 'about';
 
 /** The coding-agent CLI a settings screen is configuring, aliasing LLMProvider so agent-scoped settings read as being about an agent rather than a chat model. */
 export type AgentProvider = LLMProvider;

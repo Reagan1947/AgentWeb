@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import JSZip from 'jszip';
 
 import { api } from '@/shared/api';
-import type { FileTreeNode,Project } from '@/shared/types';
+import type { FileTreeNode, FileTreeScope, Project } from '@/shared/types';
 
 // Invalid filename characters
 const INVALID_FILENAME_CHARS = /[<>:"/\\|?*\x00-\x1f]/;
@@ -21,6 +21,7 @@ export type DeleteConfirmation = {
 
 export type UseFileTreeOperationsOptions = {
   selectedProject: Project | null;
+  scope?: FileTreeScope;
   onRefresh: () => void;
   showToast: (message: string, type: 'success' | 'error') => void;
 };
@@ -62,10 +63,13 @@ export type UseFileTreeOperationsResult = {
 
 export function useFileTreeOperations({
   selectedProject,
+  scope = 'project',
   onRefresh,
   showToast,
 }: UseFileTreeOperationsOptions): UseFileTreeOperationsResult {
   const { t } = useTranslation();
+  const workspaceScope = scope === 'workspace';
+  const canMutate = workspaceScope || Boolean(selectedProject);
 
   // State
   const [renamingItem, setRenamingItem] = useState<FileTreeNode | null>(null);
@@ -110,7 +114,7 @@ export function useFileTreeOperations({
   }, []);
 
   const handleConfirmRename = useCallback(async () => {
-    if (!renamingItem || !selectedProject) return;
+    if (!renamingItem || !canMutate || renamingItem.locked) return;
 
     const error = validateFilename(renameValue);
     if (error) {
@@ -125,10 +129,12 @@ export function useFileTreeOperations({
 
     setOperationLoading(true);
     try {
-      const response = await api.renameFile(selectedProject.projectId, {
-        oldPath: renamingItem.path,
-        newName: renameValue,
-      });
+      const response = workspaceScope
+        ? await api.renameWorkspaceFile({ oldPath: renamingItem.path, newName: renameValue })
+        : await api.renameFile(selectedProject!.projectId, {
+          oldPath: renamingItem.path,
+          newName: renameValue,
+        });
 
       if (!response.ok) {
         const data = await response.json();
@@ -143,7 +149,7 @@ export function useFileTreeOperations({
     } finally {
       setOperationLoading(false);
     }
-  }, [renamingItem, renameValue, selectedProject, validateFilename, showToast, t, onRefresh, handleCancelRename]);
+  }, [canMutate, renamingItem, renameValue, selectedProject, workspaceScope, validateFilename, showToast, t, onRefresh, handleCancelRename]);
 
   // Delete operations
   const handleStartDelete = useCallback((item: FileTreeNode) => {
@@ -156,14 +162,16 @@ export function useFileTreeOperations({
 
   const handleConfirmDelete = useCallback(async () => {
     const { item } = deleteConfirmation;
-    if (!item || !selectedProject) return;
+    if (!item || !canMutate || item.locked) return;
 
     setOperationLoading(true);
     try {
-      const response = await api.deleteFile(selectedProject.projectId, {
-        path: item.path,
-        type: item.type,
-      });
+      const response = workspaceScope
+        ? await api.deleteWorkspaceFile({ path: item.path, type: item.type })
+        : await api.deleteFile(selectedProject!.projectId, {
+          path: item.path,
+          type: item.type,
+        });
 
       if (!response.ok) {
         const data = await response.json();
@@ -183,7 +191,7 @@ export function useFileTreeOperations({
     } finally {
       setOperationLoading(false);
     }
-  }, [deleteConfirmation, selectedProject, showToast, t, onRefresh, handleCancelDelete]);
+  }, [canMutate, deleteConfirmation, selectedProject, workspaceScope, showToast, t, onRefresh, handleCancelDelete]);
 
   // Create operations
   const handleStartCreate = useCallback((parentPath: string, type: 'file' | 'directory') => {
@@ -201,7 +209,7 @@ export function useFileTreeOperations({
   }, []);
 
   const handleConfirmCreate = useCallback(async () => {
-    if (!selectedProject) return;
+    if (!canMutate) return;
 
     const error = validateFilename(newItemName);
     if (error) {
@@ -211,11 +219,13 @@ export function useFileTreeOperations({
 
     setOperationLoading(true);
     try {
-      const response = await api.createFile(selectedProject.projectId, {
-        path: newItemParent,
-        type: newItemType,
-        name: newItemName,
-      });
+      const response = workspaceScope
+        ? await api.createWorkspaceFile({ path: newItemParent, type: newItemType, name: newItemName })
+        : await api.createFile(selectedProject!.projectId, {
+          path: newItemParent,
+          type: newItemType,
+          name: newItemName,
+        });
 
       if (!response.ok) {
         const data = await response.json();
@@ -235,7 +245,7 @@ export function useFileTreeOperations({
     } finally {
       setOperationLoading(false);
     }
-  }, [selectedProject, newItemParent, newItemType, newItemName, validateFilename, showToast, t, onRefresh, handleCancelCreate]);
+  }, [canMutate, selectedProject, workspaceScope, newItemParent, newItemType, newItemName, validateFilename, showToast, t, onRefresh, handleCancelCreate]);
 
   // Copy path to clipboard
   const handleCopyPath = useCallback((item: FileTreeNode) => {
@@ -262,11 +272,17 @@ export function useFileTreeOperations({
   }, []);
 
   // Download a single file
+  const readBlob = useCallback((filePath: string) => (
+    workspaceScope
+      ? api.readWorkspaceFileBlob(filePath)
+      : api.readFileBlob(selectedProject!.projectId, filePath)
+  ), [selectedProject, workspaceScope]);
+
   const downloadSingleFile = useCallback(async (item: FileTreeNode) => {
-    if (!selectedProject) return;
+    if (!canMutate || item.locked) return;
 
     // Use the binary streaming endpoint so downloads preserve raw bytes.
-    const response = await api.readFileBlob(selectedProject.projectId, item.path);
+    const response = await readBlob(item.path);
 
     if (!response.ok) {
       throw new Error('Failed to download file');
@@ -274,11 +290,11 @@ export function useFileTreeOperations({
 
     const blob = await response.blob();
     triggerBrowserDownload(blob, item.name);
-  }, [selectedProject, triggerBrowserDownload]);
+  }, [canMutate, readBlob, triggerBrowserDownload]);
 
   // Download folder as ZIP
   const downloadFolderAsZip = useCallback(async (folder: FileTreeNode) => {
-    if (!selectedProject) return;
+    if (!canMutate || folder.locked) return;
 
     const zip = new JSZip();
 
@@ -287,7 +303,7 @@ export function useFileTreeOperations({
       const fullPath = currentPath ? `${currentPath}/${node.name}` : node.name;
 
       if (node.type === 'file') {
-        const response = await api.readFileBlob(selectedProject.projectId, node.path);
+        const response = await readBlob(node.path);
         if (!response.ok) {
           throw new Error(`Failed to download "${node.name}" for ZIP export`);
         }
@@ -315,7 +331,7 @@ export function useFileTreeOperations({
     triggerBrowserDownload(zipBlob, `${folder.name}.zip`);
 
     showToast(t('fileTree.toast.folderDownloaded', 'Folder downloaded as ZIP'), 'success');
-  }, [selectedProject, showToast, t, triggerBrowserDownload]);
+  }, [canMutate, readBlob, showToast, t, triggerBrowserDownload]);
 
   // Download file or folder. Declared after the two helpers it dispatches to so
   // it does not read them before initialization; both are memoized on

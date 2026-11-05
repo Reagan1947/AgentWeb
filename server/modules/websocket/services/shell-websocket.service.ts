@@ -5,7 +5,8 @@ import path from 'node:path';
 import pty, { type IPty } from 'node-pty';
 import { WebSocket, type RawData } from 'ws';
 
-import { parseIncomingJsonObject, stripAnsiSequences } from '@/shared/utils.js';
+import type { AuthenticatedWebSocketRequest } from '@/shared/types.js';
+import { WORKSPACES_ROOT, parseIncomingJsonObject, stripAnsiSequences } from '@/shared/utils.js';
 
 type ShellIncomingMessage = {
   type?: string;
@@ -21,6 +22,7 @@ type ShellIncomingMessage = {
   forceRestart?: boolean;
   bypassPermissions?: boolean;
   colorScheme?: string;
+  shellMode?: string;
 };
 
 type ShellColorScheme = 'light' | 'dark';
@@ -114,13 +116,61 @@ function shouldAutoOpenUrlFromOutput(value: string): boolean {
   );
 }
 
+type PreparedClaudeShell = {
+  command: string;
+  env: NodeJS.ProcessEnv;
+  /** True when the command now starts Claude inside nono. Model API keys are then removed from the inherited environment. */
+  sandboxed: boolean;
+};
+
 type ShellWebSocketDependencies = {
   resolveProviderSessionId: (
     sessionId: string,
     provider: string,
   ) => string | null | undefined;
   spawnPty?: typeof pty.spawn;
+  /**
+   * Rewrites an Agent-mode Claude command for the signed-in user's nono settings.
+   * The server composition root supplies this from the providers module.
+   */
+  prepareClaudeLaunch?: (input: {
+    userId: number;
+    projectPath: string;
+    command: string;
+  }) => Promise<PreparedClaudeShell | null>;
 };
+
+const MODEL_API_ENV_NAMES = new Set([
+  'ANTHROPIC_API_KEY',
+  'ANTHROPIC_AUTH_TOKEN',
+  'OPENAI_API_KEY',
+  'GEMINI_API_KEY',
+  'GOOGLE_API_KEY',
+  'GOOGLE_GENERATIVE_AI_API_KEY',
+  'CURSOR_API_KEY',
+  'OPENROUTER_API_KEY',
+  'GROQ_API_KEY',
+  'MISTRAL_API_KEY',
+  'DEEPSEEK_API_KEY',
+  'XAI_API_KEY',
+]);
+
+/** Drops model API keys from an environment the operator terminal or a sandboxed Claude must not read. */
+function scrubModelApiKeys(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const next: NodeJS.ProcessEnv = { ...env };
+  for (const key of Object.keys(next)) {
+    if (MODEL_API_ENV_NAMES.has(key) || key.endsWith('_API_KEY')) {
+      delete next[key];
+    }
+  }
+  return next;
+}
+
+function readShellUserId(request: AuthenticatedWebSocketRequest | undefined): number | null {
+  const raw = request?.user?.userId ?? request?.user?.id;
+  const id = typeof raw === 'number' ? raw : typeof raw === 'string' ? Number(raw) : Number.NaN;
+  return Number.isInteger(id) && id > 0 ? id : null;
+}
 
 /**
  * Reads a string field from untyped payloads and falls back when absent.
@@ -529,7 +579,8 @@ function prioritizeUserNpmGlobalBin(env: NodeJS.ProcessEnv): { key: string; valu
  */
 export function handleShellConnection(
   ws: WebSocket,
-  dependencies: ShellWebSocketDependencies
+  dependencies: ShellWebSocketDependencies,
+  request?: AuthenticatedWebSocketRequest,
 ): void {
   console.log('[INFO] Shell websocket connected');
 
@@ -553,7 +604,9 @@ export function handleShellConnection(
         const initialCommand = readString(data.initialCommand);
         const forceRestart = readBoolean(data.forceRestart);
         const colorScheme = readColorScheme(data.colorScheme);
+        const operatorTerminal = provider === 'operator-terminal';
         const isPlainShell =
+          operatorTerminal ||
           readBoolean(data.isPlainShell) ||
           (!!initialCommand && !hasSession) ||
           provider === 'plain-shell';
@@ -571,7 +624,9 @@ export function handleShellConnection(
           isPlainShell && initialCommand
             ? `_cmd_${Buffer.from(initialCommand).toString('base64').slice(0, 16)}`
             : '';
-        ptySessionKey = `${projectPath}_${sessionId ?? 'default'}${commandSuffix}`;
+        ptySessionKey = operatorTerminal
+          ? `operator-terminal:${WORKSPACES_ROOT}`
+          : `${projectPath}_${sessionId ?? 'default'}${commandSuffix}`;
 
         if (isLoginCommand || forceRestart) {
           const oldSession = ptySessionsMap.get(ptySessionKey);
@@ -617,13 +672,17 @@ export function handleShellConnection(
         }
 
         const resolvedProjectPath = path.resolve(projectPath);
+        const launchDirectory = operatorTerminal ? WORKSPACES_ROOT : resolvedProjectPath;
         try {
-          const stats = fs.statSync(resolvedProjectPath);
+          const stats = fs.statSync(launchDirectory);
           if (!stats.isDirectory()) {
             throw new Error('Not a directory');
           }
         } catch {
-          ws.send(JSON.stringify({ type: 'error', message: 'Invalid project path' }));
+          ws.send(JSON.stringify({
+            type: 'error',
+            message: operatorTerminal ? 'Workspace root is not available' : 'Invalid project path',
+          }));
           return;
         }
 
@@ -633,36 +692,65 @@ export function handleShellConnection(
           return;
         }
 
-        const { command: shellCommand, claudeFollowsAppTheme } = buildShellCommand(
+        const { command: builtCommand, claudeFollowsAppTheme } = buildShellCommand(
           data,
           dependencies,
           resolvedProjectPath,
         );
+        let shellCommand = builtCommand;
         const resumeSessionId = resolveResumeSessionId(data, dependencies);
-        const claudeColorScheme = claudeFollowsAppTheme ? colorScheme : null;
+        const claudeColorScheme = !operatorTerminal && claudeFollowsAppTheme ? colorScheme : null;
         const shell = os.platform() === 'win32' ? 'powershell.exe' : 'bash';
-        const shellArgs =
-          os.platform() === 'win32' ? ['-Command', shellCommand] : ['-c', shellCommand];
         const termCols = readNumber(data.cols, 80);
         const termRows = readNumber(data.rows, 24);
         const prioritizedPath = prioritizeUserNpmGlobalBin(process.env);
+        let launchEnv: NodeJS.ProcessEnv = {
+          ...process.env,
+          [prioritizedPath.key]: prioritizedPath.value,
+          TERM: 'xterm-256color',
+          COLORTERM: 'truecolor',
+          FORCE_COLOR: '3',
+          // rxvt's "foreground;background" palette indices (15 = white, 0 = black).
+          // Programs that cannot query the terminal (vim, Claude Code's "auto"
+          // theme before its OSC 11 reply arrives) read it to pick light or dark.
+          ...(colorScheme ? { COLORFGBG: colorScheme === 'light' ? '0;15' : '15;0' } : {}),
+        };
+
+        if (operatorTerminal) {
+          launchEnv = scrubModelApiKeys(launchEnv);
+        } else if (provider === 'claude' && !isPlainShell && dependencies.prepareClaudeLaunch) {
+          const userId = readShellUserId(request);
+          if (userId) {
+            try {
+              const prepared = await dependencies.prepareClaudeLaunch({
+                userId,
+                projectPath: resolvedProjectPath,
+                command: shellCommand,
+              });
+              if (prepared) {
+                shellCommand = prepared.command;
+                launchEnv = prepared.sandboxed
+                  ? { ...scrubModelApiKeys(launchEnv), ...prepared.env }
+                  : { ...launchEnv, ...prepared.env };
+              }
+            } catch (error) {
+              const message = error instanceof Error ? error.message : 'Could not start Claude inside nono';
+              ws.send(JSON.stringify({ type: 'error', message }));
+              return;
+            }
+          }
+        }
+
+        const shellArgs = operatorTerminal
+          ? (os.platform() === 'win32' ? ['-NoLogo', '-NoExit'] : ['-i'])
+          : (os.platform() === 'win32' ? ['-Command', shellCommand] : ['-c', shellCommand]);
 
         shellProcess = (dependencies.spawnPty ?? pty.spawn)(shell, shellArgs, {
           name: 'xterm-256color',
           cols: termCols,
           rows: termRows,
-          cwd: resolvedProjectPath,
-          env: {
-            ...process.env,
-            [prioritizedPath.key]: prioritizedPath.value,
-            TERM: 'xterm-256color',
-            COLORTERM: 'truecolor',
-            FORCE_COLOR: '3',
-            // rxvt's "foreground;background" palette indices (15 = white, 0 = black).
-            // Programs that cannot query the terminal (vim, Claude Code's "auto"
-            // theme before its OSC 11 reply arrives) read it to pick light or dark.
-            ...(colorScheme ? { COLORFGBG: colorScheme === 'light' ? '0;15' : '15;0' } : {}),
-          },
+          cwd: launchDirectory,
+          env: launchEnv,
         });
 
         ptySessionsMap.set(ptySessionKey, {
@@ -780,8 +868,10 @@ export function handleShellConnection(
           shellProcess = null;
         });
 
-        let welcomeMsg = `\x1b[36mStarting terminal in: ${projectPath}\x1b[0m\r\n`;
-        if (!isPlainShell) {
+        let welcomeMsg = operatorTerminal
+          ? `\x1b[36mOperator terminal in ${WORKSPACES_ROOT}. This shell does not run inside nono.\x1b[0m\r\n`
+          : `\x1b[36mStarting terminal in: ${projectPath}\x1b[0m\r\n`;
+        if (!operatorTerminal && !isPlainShell) {
           const providerName =
             provider === 'cursor'
               ? 'Cursor'
