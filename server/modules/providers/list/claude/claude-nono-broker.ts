@@ -6,11 +6,16 @@
  * sandboxed child and receives phantom tokens plus localhost base URLs.
  * Extra folders from the nono settings tab are added to the filesystem allow list.
  * The prompt names every variable and never includes a stored secret.
+ *
+ * Once the user enables nono, every failure here stops the turn. Claude must
+ * never fall back to running outside the sandbox the user asked for.
  */
 
+import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { promisify } from 'node:util';
 
 import { userPreferencesDb } from '@/modules/database/index.js';
 import {
@@ -21,13 +26,20 @@ import {
   type AgentVaultRuntimeSecret,
 } from '@/modules/providers/shared/agent-vault.js';
 import {
+  AppError,
   findExecutableOnPath,
+  getModuleDirectory,
+  isNonoFolderCoveringHome,
   NONO_SETTINGS_PREFERENCE_KEY,
   readNonoSettings,
 } from '@/shared/utils.js';
 import type { NonoSettings } from '@/shared/types.js';
 
 const WRAPPER_NAME = 'claude-broker.mjs';
+const PREFLIGHT_TIMEOUT_MS = 15_000;
+const PREFLIGHT_ERROR_LENGTH = 800;
+
+const execFileAsync = promisify(execFile);
 
 /** Metadata for one API secret written into a nono profile. The secret value is never part of this type. */
 export type BrokeredProfileCredential = {
@@ -48,6 +60,10 @@ export function buildBrokeredNonoProfile(input: {
   credentials: Array<BrokeredProfileCredential & { note?: string | null }>;
   claudeTempDir: string;
   allowedFolders?: string[];
+  /** Folders a sandboxed process needs to read: the Node install and the AgentWeb MCP entry. */
+  readFolders?: string[];
+  /** The server's own port. Browser MCP tools call it directly once API secrets turn on nono's proxy. */
+  serverPort?: number;
 }): { profile: Record<string, unknown>; promptAppend: string } {
   const apiCredentials = input.credentials.filter((credential) => isApiVaultSecret(credential));
   const customCredentials: Record<string, unknown> = {};
@@ -82,12 +98,19 @@ export function buildBrokeredNonoProfile(input: {
       meta: { name: 'agentweb-broker', version: '1.0.0' },
       // --allow-cwd grants the open project only when the profile names a workdir level.
       workdir: { access: 'readwrite' },
+      groups: {
+        // Skipped on platforms they do not apply to. nono adds its deny groups by itself.
+        include: ['claude_code_linux', 'claude_cache_linux', 'node_runtime', 'mise_manager', 'git_config'],
+      },
       filesystem: {
         allow: [...new Set(['$HOME/.claude', input.claudeTempDir, ...allowedFolders])],
+        allow_file: ['$HOME/.claude.json', '$HOME/.claude.json.lock'],
+        read: [...new Set(input.readFolders ?? [])],
       },
       network: {
         credentials: apiCredentials.map((credential) => credential.name),
         custom_credentials: customCredentials,
+        connect_port: apiCredentials.length > 0 && input.serverPort ? [input.serverPort] : [],
       },
     },
     promptAppend,
@@ -151,6 +174,82 @@ function secretEnv(credentials: AgentVaultRuntimeSecret[]): NodeJS.ProcessEnv {
   return env;
 }
 
+/**
+ * The shared `.git` directory of a linked worktree, or null for anything else.
+ *
+ * A worktree's `.git` is a file pointing at `<repo>/.git/worktrees/<name>`, which
+ * sits outside the project. Commits there fail unless nono can write to it.
+ * Used by the Claude broker and its tests.
+ */
+export function resolveWorktreeGitDir(projectPath: string): string | null {
+  try {
+    const dotGit = path.join(projectPath, '.git');
+    if (!fs.statSync(dotGit).isFile()) {
+      return null;
+    }
+    const match = /^gitdir:\s*(.+)$/m.exec(fs.readFileSync(dotGit, 'utf8'));
+    if (!match) {
+      return null;
+    }
+    const gitDir = path.resolve(projectPath, match[1].trim());
+    const worktrees = path.dirname(gitDir);
+    return path.basename(worktrees) === 'worktrees' ? path.dirname(worktrees) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Nearest folder above this module that holds package.json. The browser MCP entry lives under it. */
+function findAppRoot(): string {
+  const start = getModuleDirectory(import.meta.url);
+  let current = start;
+  while (path.dirname(current) !== current) {
+    if (fs.existsSync(path.join(current, 'package.json'))) {
+      return current;
+    }
+    current = path.dirname(current);
+  }
+  return start;
+}
+
+/**
+ * Asks nono to resolve the profile without starting Claude, so a policy conflict
+ * becomes a readable error. The wrapper runs with --silent and cannot report one.
+ */
+async function preflightNonoProfile(input: {
+  nonoPath: string;
+  profilePath: string;
+  claudeExecutable: string;
+  projectPath: string;
+  env: NodeJS.ProcessEnv;
+}): Promise<void> {
+  try {
+    await execFileAsync(input.nonoPath, [
+      'run',
+      '--dry-run',
+      '--no-rollback',
+      '--no-rollback-prompt',
+      '--profile',
+      input.profilePath,
+      '--allow-cwd',
+      '--',
+      input.claudeExecutable,
+      '--version',
+    ], {
+      cwd: input.projectPath,
+      env: { ...process.env, ...input.env, NO_COLOR: '1' },
+      timeout: PREFLIGHT_TIMEOUT_MS,
+    });
+  } catch (error) {
+    const failure = error as { stderr?: string; message?: string };
+    const detail = (failure.stderr || failure.message || '').trim().slice(0, PREFLIGHT_ERROR_LENGTH);
+    throw new AppError(`nono refused to start Claude: ${detail}`, {
+      code: 'NONO_POLICY_REJECTED',
+      statusCode: 400,
+    });
+  }
+}
+
 function loadUserNonoSettings(userId: number): NonoSettings {
   return readNonoSettings(userPreferencesDb.getPreferences(userId)[NONO_SETTINGS_PREFERENCE_KEY]);
 }
@@ -160,15 +259,16 @@ function loadUserNonoSettings(userId: number): NonoSettings {
  *
  * Returns null when nono is off and there is nothing plain to pass through.
  * nono wraps Claude only after the user enables it. API secrets then stay in the
- * nono parent; a missing nono binary must not fall back to putting those secrets
- * in Claude's environment. Plain secrets are still applied. Extra folders from
- * the nono settings tab are added to the profile allow list.
+ * nono parent. Extra folders from the nono settings tab are added to the profile
+ * allow list. Throws `AppError` when nono is enabled but cannot sandbox this
+ * project; the Claude runtime reports that to the user and does not start Claude.
  * Used by the Claude runtime before it starts a session.
  */
-export function applyClaudeNonoBroker(input: {
+export async function applyClaudeNonoBroker(input: {
   userId: number;
   claudeExecutable: string | undefined;
-}): { executablePath?: string; env: NodeJS.ProcessEnv; promptAppend: string } | null {
+  projectPath: string | undefined;
+}): Promise<{ executablePath?: string; env: NodeJS.ProcessEnv; promptAppend: string } | null> {
   const settings = loadUserNonoSettings(input.userId);
   const secrets = loadAgentVaultSecrets(input.userId);
   const apiSecrets = secrets.filter((secret) => isApiVaultSecret(secret));
@@ -192,11 +292,20 @@ export function applyClaudeNonoBroker(input: {
 
   const nonoPath = findExecutableOnPath('nono');
   if (!nonoPath || process.platform === 'win32') {
-    console.warn(nonoPath
-      ? '[Claude] nono is enabled, but it does not run on native Windows'
-      : '[Claude] nono is enabled, but it is not installed');
-    // API secrets are not in the environment, so the prompt must not name them.
-    return plainOnly();
+    throw new AppError(nonoPath
+      ? 'nono is enabled, but it does not run on native Windows. Turn it off in Settings > nono to use Claude here.'
+      : 'nono is enabled, but it is not installed on this server. Install it, or turn it off in Settings > nono.', {
+      code: 'NONO_UNAVAILABLE',
+      statusCode: 503,
+    });
+  }
+
+  const projectPath = input.projectPath || process.cwd();
+  if (isNonoFolderCoveringHome(projectPath)) {
+    throw new AppError(
+      `nono cannot protect your home directory while ${projectPath} is the open project. Open a project folder inside it instead.`,
+      { code: 'NONO_PROJECT_INVALID', statusCode: 400 },
+    );
   }
 
   const paths = brokerPaths(input.userId);
@@ -211,7 +320,13 @@ export function applyClaudeNonoBroker(input: {
       credentialFormat: credential.credentialFormat,
     })),
     claudeTempDir: paths.tempDir,
-    allowedFolders: settings.allowedFolders,
+    allowedFolders: [
+      ...settings.allowedFolders,
+      ...[resolveWorktreeGitDir(projectPath)].filter((folder): folder is string => Boolean(folder)),
+    ],
+    readFolders: [findAppRoot(), path.dirname(path.dirname(process.execPath))]
+      .filter((folder) => !isNonoFolderCoveringHome(folder)),
+    serverPort: Number.parseInt(process.env.SERVER_PORT || process.env.PORT || '3001', 10),
   });
   const serialized = JSON.stringify(built.profile);
   for (const credential of secrets) {
@@ -224,6 +339,14 @@ export function applyClaudeNonoBroker(input: {
   const claudeExecutable = input.claudeExecutable && input.claudeExecutable.includes(path.sep)
     ? input.claudeExecutable
     : (findExecutableOnPath(input.claudeExecutable || 'claude') || input.claudeExecutable || 'claude');
+
+  await preflightNonoProfile({
+    nonoPath,
+    profilePath: paths.profilePath,
+    claudeExecutable,
+    projectPath,
+    env: secretEnv(apiSecrets),
+  });
 
   return {
     executablePath: paths.wrapperPath,

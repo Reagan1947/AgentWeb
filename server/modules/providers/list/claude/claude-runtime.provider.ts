@@ -43,7 +43,7 @@ import {
   getReportedClaudeContextWindow,
   rememberClaudeContextWindow
 } from '@/modules/providers/services/provider-token-usage.service.js';
-import { createCompleteMessage, createNormalizedMessage } from '@/shared/utils.js';
+import { AppError, createCompleteMessage, createNormalizedMessage } from '@/shared/utils.js';
 import type {
   AnyRecord,
   BackgroundTaskSummary,
@@ -1110,8 +1110,9 @@ async function queryClaudeSDK(
     const brokerUserId = Number(ws?.userId);
     if (Number.isInteger(brokerUserId) && brokerUserId > 0) {
       try {
-        const broker = applyClaudeNonoBroker({
+        const broker = await applyClaudeNonoBroker({
           userId: brokerUserId,
+          projectPath: options.cwd,
           claudeExecutable: typeof sdkOptions.pathToClaudeCodeExecutable === 'string'
             ? sdkOptions.pathToClaudeCodeExecutable
             : undefined,
@@ -1130,7 +1131,13 @@ async function queryClaudeSDK(
           }
         }
       } catch (error) {
-        console.warn('[Claude] Failed to start the nono credential broker:', error);
+        // The user asked for a sandbox. Report why it failed instead of running Claude without one.
+        throw error instanceof AppError
+          ? error
+          : new AppError(`Could not start Claude inside nono: ${(error as Error).message}`, {
+            code: 'NONO_START_FAILED',
+            statusCode: 500,
+          });
       }
     }
 

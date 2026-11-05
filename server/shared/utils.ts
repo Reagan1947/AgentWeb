@@ -1583,6 +1583,39 @@ function expandNonoHomePrefix(input: string): string {
   return input;
 }
 
+/** Resolves symlinks in the longest part of a path that exists, keeping the rest as written. */
+function resolveExistingPrefix(input: string): string {
+  const missing: string[] = [];
+  let current = path.resolve(input);
+  while (true) {
+    try {
+      return path.join(fs.realpathSync(current), ...missing);
+    } catch {
+      const parent = path.dirname(current);
+      if (parent === current) {
+        return path.resolve(input);
+      }
+      missing.unshift(path.basename(current));
+      current = parent;
+    }
+  }
+}
+
+/**
+ * True when a folder is the home directory or contains it, after resolving symlinks.
+ *
+ * Landlock cannot deny a child of an allowed folder, so granting such a folder
+ * would expose `~/.ssh` and the like. nono refuses to start with that policy on
+ * Linux. Settings rejects these folders when saving; the Claude broker checks the
+ * open project too, because `--allow-cwd` grants it the same way.
+ */
+export function isNonoFolderCoveringHome(folder: string, home: string = os.homedir()): boolean {
+  const resolvedFolder = resolveExistingPrefix(folder);
+  const resolvedHome = resolveExistingPrefix(home);
+  return resolvedFolder === resolvedHome
+    || resolvedHome.startsWith(resolvedFolder.endsWith(path.sep) ? resolvedFolder : `${resolvedFolder}${path.sep}`);
+}
+
 /**
  * Canonical absolute folder nono may be granted, or null when the path is not safe to store.
  *
@@ -1609,7 +1642,8 @@ function normalizeNonoAllowedFolder(input: string): string | null {
  * Reads a stored nono preference.
  *
  * A missing or corrupt value means nono is off and no extra folders are granted.
- * Invalid folder entries are dropped so one bad path cannot discard the rest.
+ * Invalid folder entries, and any folder covering the home directory, are dropped
+ * so one bad path cannot discard the rest or stop Claude from starting.
  * Used by the Settings service when it returns the current choice, and by the
  * Claude broker before it decides whether to wrap Claude.
  */
@@ -1625,7 +1659,7 @@ export function readNonoSettings(value: unknown): NonoSettings {
         continue;
       }
       const normalized = normalizeNonoAllowedFolder(folder);
-      if (!normalized || allowedFolders.includes(normalized)) {
+      if (!normalized || allowedFolders.includes(normalized) || isNonoFolderCoveringHome(normalized)) {
         continue;
       }
       allowedFolders.push(normalized);
@@ -1645,7 +1679,8 @@ export function readNonoSettings(value: unknown): NonoSettings {
  *
  * Both fields are required so a toggle and a folder edit cannot erase each other
  * by sending a partial object. Throws `AppError` for a relative path, the
- * filesystem root, or a list that is too long. The Settings service is the only caller.
+ * filesystem root, a folder covering the home directory, or a list that is too long.
+ * The Settings service is the only caller.
  */
 export function parseNonoSettingsUpdate(input: unknown): NonoSettings {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
@@ -1678,6 +1713,12 @@ export function parseNonoSettingsUpdate(input: unknown): NonoSettings {
     const normalized = typeof folder === 'string' ? normalizeNonoAllowedFolder(folder) : null;
     if (!normalized) {
       throw new AppError('Accessible folders must be absolute paths, not the filesystem root', {
+        code: 'NONO_FOLDER_INVALID',
+        statusCode: 400,
+      });
+    }
+    if (isNonoFolderCoveringHome(normalized)) {
+      throw new AppError('Accessible folders cannot be your home directory or a folder that contains it', {
         code: 'NONO_FOLDER_INVALID',
         statusCode: 400,
       });

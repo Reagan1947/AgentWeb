@@ -185,3 +185,26 @@ test('nono settings store an enabled choice and canonical absolute folders', () 
   assert.deepEqual(saved.allowedFolders, ['/tmp/nono-allow', homeFolder]);
   assert.deepEqual(service.getNonoSettings(1).allowedFolders, ['/tmp/nono-allow', homeFolder]);
 });
+
+test('nono settings reject the home directory and any folder containing it', () => {
+  const service = createSettingsService(dependencies());
+  for (const folder of ['~', path.dirname(os.homedir())]) {
+    if (folder === path.parse(os.homedir()).root) {
+      continue;
+    }
+    assert.throws(
+      () => service.updateNonoSettings(1, { enabled: true, allowedFolders: [folder] }),
+      (error: unknown) => error instanceof Error && error.message.includes('home directory'),
+    );
+  }
+});
+
+test('stored nono settings drop a folder covering the home directory', () => {
+  const service = createSettingsService(dependencies({
+    nonoSettings: {
+      read: () => ({ enabled: true, allowedFolders: ['~', '/tmp/nono-keep'] }),
+      save: () => undefined,
+    },
+  }));
+  assert.deepEqual(service.getNonoSettings(1).allowedFolders, ['/tmp/nono-keep']);
+});

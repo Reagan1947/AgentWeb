@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
 
-import { buildBrokeredNonoProfile } from '@/modules/providers/list/claude/claude-nono-broker.js';
+import { buildBrokeredNonoProfile, resolveWorktreeGitDir } from '@/modules/providers/list/claude/claude-nono-broker.js';
 
 test('brokered nono profile names env vars and omits the secret', () => {
   const secret = 'super-secret-value';
@@ -50,4 +53,52 @@ test('brokered nono profile grants the configured folders and still omits secret
   const profile = built.profile as { filesystem: { allow: string[] } };
   assert.deepEqual(profile.filesystem.allow, ['$HOME/.claude', '/tmp/cloudcli-claude', '/srv/notes']);
   assert.equal(JSON.stringify(built.profile).includes('super-secret'), false);
+});
+
+test('brokered nono profile opens the server port only when API secrets turn on the proxy', () => {
+  const credential = {
+    name: 'billing_api',
+    upstream: 'https://api.example.com',
+    injectHeader: 'Authorization',
+    credentialFormat: 'Bearer {}',
+  };
+  const withSecret = buildBrokeredNonoProfile({
+    credentials: [credential],
+    claudeTempDir: '/tmp/c',
+    serverPort: 3001,
+  }).profile as { network: { connect_port: number[] } };
+  const withoutSecret = buildBrokeredNonoProfile({
+    credentials: [],
+    claudeTempDir: '/tmp/c',
+    serverPort: 3001,
+  }).profile as { network: { connect_port: number[] } };
+  assert.deepEqual(withSecret.network.connect_port, [3001]);
+  assert.deepEqual(withoutSecret.network.connect_port, []);
+});
+
+test('brokered nono profile grants Claude config files and read-only runtime folders', () => {
+  const profile = buildBrokeredNonoProfile({
+    credentials: [],
+    claudeTempDir: '/tmp/c',
+    readFolders: ['/app', '/app'],
+  }).profile as { filesystem: { allow_file: string[]; read: string[] }; groups: { include: string[] } };
+  assert.deepEqual(profile.filesystem.read, ['/app']);
+  assert.ok(profile.filesystem.allow_file.includes('$HOME/.claude.json'));
+  assert.ok(profile.groups.include.includes('node_runtime'));
+});
+
+test('resolveWorktreeGitDir finds the shared .git only for a linked worktree', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nono-worktree-'));
+  try {
+    const worktree = path.join(root, 'worktree');
+    const plain = path.join(root, 'plain');
+    fs.mkdirSync(worktree);
+    fs.mkdirSync(path.join(plain, '.git'), { recursive: true });
+    fs.writeFileSync(path.join(worktree, '.git'), 'gitdir: /srv/repo/.git/worktrees/feature\n');
+    assert.equal(resolveWorktreeGitDir(worktree), '/srv/repo/.git');
+    assert.equal(resolveWorktreeGitDir(plain), null);
+    assert.equal(resolveWorktreeGitDir(path.join(root, 'missing')), null);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });
