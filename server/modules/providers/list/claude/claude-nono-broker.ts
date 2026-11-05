@@ -242,7 +242,8 @@ async function preflightNonoProfile(input: {
     });
   } catch (error) {
     const failure = error as { stderr?: string; message?: string };
-    const detail = (failure.stderr || failure.message || '').trim().slice(0, PREFLIGHT_ERROR_LENGTH);
+    // nono prints its banner and capability list first; the refusal is at the end.
+    const detail = (failure.stderr || failure.message || '').trim().slice(-PREFLIGHT_ERROR_LENGTH);
     throw new AppError(`nono refused to start Claude: ${detail}`, {
       code: 'NONO_POLICY_REJECTED',
       statusCode: 400,
