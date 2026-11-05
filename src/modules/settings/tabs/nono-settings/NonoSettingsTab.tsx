@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FolderOpen, Loader2, Trash2 } from 'lucide-react';
+import { Loader2, Trash2 } from 'lucide-react';
 
 import BrokeredCredentialsSection from '@/modules/settings/tabs/nono-settings/BrokeredCredentialsSection';
 import SettingsCard from '@/modules/settings/SettingsCard';
 import SettingsRow from '@/modules/settings/SettingsRow';
 import SettingsSection from '@/modules/settings/SettingsSection';
 import SettingsToggle from '@/modules/settings/SettingsToggle';
-import { FolderBrowserModal } from '@/modules/project-creation-wizard';
+import { ChooseFolderButton, FolderBrowserModal } from '@/modules/project-creation-wizard';
 import { api, readApiJson } from '@/shared/api';
-import { Button, InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@/shared/ui';
+import { Button, InputGroup, InputGroupAddon, InputGroupInput } from '@/shared/ui';
 
 type NonoSettings = {
   enabled: boolean;
@@ -182,13 +182,7 @@ export default function NonoSettingsTab() {
                   }}
                 />
                 <InputGroupAddon align="inline-end">
-                  <InputGroupButton
-                    onClick={() => setBrowserOpen(true)}
-                    disabled={isSaving || !settings}
-                  >
-                    <FolderOpen className="size-4" />
-                    {t('nono.browseFolder')}
-                  </InputGroupButton>
+                  <ChooseFolderButton onClick={() => setBrowserOpen(true)} disabled={isSaving || !settings} />
                 </InputGroupAddon>
               </InputGroup>
               <Button

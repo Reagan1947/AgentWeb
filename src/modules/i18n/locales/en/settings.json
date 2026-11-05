@@ -400,7 +400,6 @@
     "foldersDescription": "The open project and Claude's own config directory stay available. Add any other folders Claude should be able to read and write. Your home directory and folders containing it are not allowed. Changes apply to new sessions.",
     "folderPlaceholder": "/absolute/path/to/folder",
     "addFolder": "Add folder",
-    "browseFolder": "Browse",
     "removeFolder": "Remove folder",
     "foldersEmpty": "No extra folders yet.",
     "apiSecretsPaused": "nono is off, so these API secrets stay stored and are not given to Claude.",

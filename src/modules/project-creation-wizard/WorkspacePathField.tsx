@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useTranslation } from 'react-i18next';
 
-import { FolderBoldIcon, InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@/shared/ui';
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@/shared/ui';
 import { browseFilesystemFolders } from '@/modules/project-creation-wizard/utils/workspaceApi';
 import { getSuggestionRootPath } from '@/modules/project-creation-wizard/utils/pathUtils';
 import type { FolderSuggestion } from '@/shared/types';
+import ChooseFolderButton from '@/modules/project-creation-wizard/ChooseFolderButton';
 import FolderBrowserModal from '@/modules/project-creation-wizard/FolderBrowserModal';
 
 type WorkspacePathFieldProps = {
@@ -23,7 +23,6 @@ export default function WorkspacePathField({
   onChange,
   onAdvanceToConfirm,
 }: WorkspacePathFieldProps) {
-  const { t } = useTranslation();
   const [pathSuggestions, setPathSuggestions] = useState<FolderSuggestion[]>([]);
   const [showPathDropdown, setShowPathDropdown] = useState(false);
   const [showFolderBrowser, setShowFolderBrowser] = useState(false);
@@ -96,15 +95,7 @@ export default function WorkspacePathField({
             disabled={disabled}
           />
           <InputGroupAddon align="inline-end">
-            <InputGroupButton
-              aria-label="Choice Folder"
-              title={t('common:misc.browseFolders')}
-              onClick={() => setShowFolderBrowser(true)}
-              disabled={disabled}
-            >
-              <FolderBoldIcon className="size-4" />
-              Choice Folder
-            </InputGroupButton>
+            <ChooseFolderButton onClick={() => setShowFolderBrowser(true)} disabled={disabled} />
           </InputGroupAddon>
         </InputGroup>
 

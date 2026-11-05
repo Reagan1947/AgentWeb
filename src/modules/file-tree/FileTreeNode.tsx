@@ -120,8 +120,7 @@ export default function FileTreeNode({
       : viewMode === 'compact'
       ? 'group flex items-center justify-between py-1.5 pr-2 hover:bg-accent/60 cursor-pointer rounded-sm transition-colors duration-100'
       : 'group flex items-center gap-1.5 py-1.5 pr-2 cursor-pointer rounded-sm hover:bg-accent/60 transition-colors duration-100',
-    isDirectory && isOpen && 'border-l-2 border-primary/30',
-    (isDirectory && !isOpen) || !isDirectory ? 'border-l-2 border-transparent' : '',
+    'border-l-2 border-transparent',
     'relative',
     isDropTarget && 'bg-blue-500/10 ring-1 ring-inset ring-blue-500/40',
   );

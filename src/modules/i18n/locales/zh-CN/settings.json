@@ -378,7 +378,6 @@
     "foldersDescription": "当前打开的项目和 Claude 自己的配置目录始终可用。在这里添加它还需要读写的其他文件夹。不能添加主目录或包含主目录的文件夹。改动对新会话生效。",
     "folderPlaceholder": "文件夹的绝对路径",
     "addFolder": "添加文件夹",
-    "browseFolder": "浏览",
     "removeFolder": "移除文件夹",
     "foldersEmpty": "还没有额外文件夹。",
     "apiSecretsPaused": "nono 已关闭，这些接口秘密仍会保存，但不会交给 Claude。",
