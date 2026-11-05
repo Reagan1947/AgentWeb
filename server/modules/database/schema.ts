@@ -39,6 +39,33 @@ CREATE TABLE IF NOT EXISTS user_credentials (
 );
 `;
 
+/**
+ * Agent Vault secrets.
+ *
+ * Each row is one named secret for a user. `secret` stays in this table and is
+ * never returned by list APIs. `upstream` is empty unless the secret is an
+ * https API the agent should call: then nono swaps a phantom token for
+ * `secret` when forwarding. `note` is an optional description and may be null.
+ * `note` is last so fresh installs match the column order an upgraded database
+ * gets from ALTER TABLE.
+ */
+export const BROKERED_API_CREDENTIALS_TABLE_SCHEMA_SQL = `
+CREATE TABLE IF NOT EXISTS brokered_api_credentials (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    upstream TEXT NOT NULL,
+    inject_header TEXT NOT NULL,
+    credential_format TEXT NOT NULL,
+    secret TEXT NOT NULL,
+    is_active BOOLEAN DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    note TEXT,
+    UNIQUE(user_id, name),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+`;
+
 export const USER_NOTIFICATION_PREFERENCES_TABLE_SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS user_notification_preferences (
     user_id INTEGER PRIMARY KEY,
@@ -274,6 +301,9 @@ CREATE INDEX IF NOT EXISTS idx_api_keys_active ON api_keys(is_active);
 
 ${USER_CREDENTIALS_TABLE_SCHEMA_SQL}
 CREATE INDEX IF NOT EXISTS idx_user_credentials_user_id ON user_credentials(user_id);
+
+${BROKERED_API_CREDENTIALS_TABLE_SCHEMA_SQL}
+CREATE INDEX IF NOT EXISTS idx_brokered_api_credentials_user_id ON brokered_api_credentials(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_credentials_type ON user_credentials(credential_type);
 CREATE INDEX IF NOT EXISTS idx_user_credentials_active ON user_credentials(is_active);
 

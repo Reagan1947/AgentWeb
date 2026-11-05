@@ -13,14 +13,17 @@ type FolderBrowserModalProps = {
   autoAdvanceOnSelect: boolean;
   onClose: () => void;
   onFolderSelected: (folderPath: string, advanceToConfirm: boolean) => void;
+  /** Stacking class so a caller already inside a modal can lift this dialog above it. */
+  layerClassName?: string;
 };
 
-/** Opened by WorkspacePathField so the user can browse the filesystem and pick or create the workspace folder. */
+/** Opened by the project-creation wizard to pick a workspace, and by the settings module to choose a folder nono may access. */
 export default function FolderBrowserModal({
   isOpen,
   autoAdvanceOnSelect,
   onClose,
   onFolderSelected,
+  layerClassName = 'z-[70]',
 }: FolderBrowserModalProps) {
   const { t } = useTranslation();
   // Directory listings keyed by absolute path. Expanding a folder reads this cache instead of browsing again.
@@ -216,8 +219,9 @@ export default function FolderBrowserModal({
   return (
     <Dialog open={isOpen} onOpenChange={(nextOpen) => { if (!nextOpen) handleClose(); }}>
       <DialogContent
-        wrapperClassName="z-[70]"
-        className="z-[70] flex h-[min(80vh,40rem)] w-full max-w-2xl flex-col gap-0 overflow-hidden p-0"
+        data-escape-layer=""
+        wrapperClassName={layerClassName}
+        className={`${layerClassName} flex h-[min(80vh,40rem)] w-full max-w-2xl flex-col gap-0 overflow-hidden p-0`}
       >
         <div className="flex items-start justify-between gap-3 border-b border-border px-6 py-4">
           <div className="min-w-0">

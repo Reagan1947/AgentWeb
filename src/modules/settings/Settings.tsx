@@ -9,6 +9,7 @@ import AgentsSettingsTab from '@/modules/settings/tabs/agents-settings/AgentsSet
 import AppearanceSettingsTab from '@/modules/settings/tabs/AppearanceSettingsTab';
 import CommandsSettingsTab from '@/modules/settings/tabs/CommandsSettingsTab';
 import CredentialsSettingsTab from '@/modules/settings/tabs/api-settings/CredentialsSettingsTab';
+import NonoSettingsTab from '@/modules/settings/tabs/nono-settings/NonoSettingsTab';
 import VoiceSettingsTab from '@/modules/settings/tabs/VoiceSettingsTab';
 import GitSettingsTab from '@/modules/settings/tabs/git-settings/GitSettingsTab';
 import BrowserUseSettingsTab from '@/modules/settings/tabs/browser-use-settings/BrowserUseSettingsTab';
@@ -285,6 +286,8 @@ function Settings({
               )}
 
               {activeTab === 'api' && <CredentialsSettingsTab />}
+
+              {activeTab === 'nono' && <NonoSettingsTab />}
 
               {activeTab === 'voice' && <VoiceSettingsTab />}
 

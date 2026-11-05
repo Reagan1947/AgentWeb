@@ -9,6 +9,7 @@ import {
 } from '@/shared/image-attachments.js';
 import { notifyRunFailed, notifyRunStopped } from '@/modules/notifications/index.js';
 import { createCompleteMessage, createNormalizedMessage, flattenPromptForWindowsShell, stripAnsiSequences } from '@/shared/utils.js';
+import { agentVaultProcessEnv } from '@/modules/providers/shared/agent-vault.js';
 import {
   cursorAcpPermissions,
   cursorNeedsInteractiveApproval,
@@ -51,6 +52,7 @@ async function spawnCursor(command, options = {}, ws, context) {
   // would be swallowed and leave the returned promise pending forever.
   const providerSessionId = context.resolveProviderSessionId(options.sessionId);
   const resolvedModel = await context.resolveResumeModel(options.sessionId, options.model);
+  const vaultEnv = agentVaultProcessEnv(Number(ws?.userId));
 
   // spawn reports a missing cwd as the same ENOENT as a missing binary, which
   // reads as "Cursor failed to start" when the project folder was moved.
@@ -74,6 +76,7 @@ async function spawnCursor(command, options = {}, ws, context) {
       processes: activeCursorProcesses,
       spawnImpl: spawnFunction,
       isInstalled: () => context.isProviderInstalled(),
+      extraEnv: vaultEnv,
     });
   }
 
@@ -199,7 +202,7 @@ async function spawnCursor(command, options = {}, ws, context) {
       const cursorProcess = spawnFunction('cursor-agent', args, {
         cwd: workingDir,
         stdio: ['pipe', 'pipe', 'pipe'],
-        env: { ...process.env } // Inherit all environment variables
+        env: { ...process.env, ...vaultEnv } // Inherit all environment variables, plus Agent Vault secrets
       });
 
       activeCursorProcesses.set(processKey, cursorProcess);

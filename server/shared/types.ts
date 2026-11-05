@@ -974,6 +974,48 @@ export type CreateCredentialResult = {
   credentialType: string;
 };
 
+/**
+ * Agent Vault secret metadata returned to settings clients.
+ *
+ * `secret` is omitted. `note` describes the secret and may be null. `upstream`
+ * is empty when the entry is not an https API. `name` is the source of the
+ * environment variable the agent is told to use.
+ */
+export type BrokeredCredentialPublicRow = {
+  id: number;
+  name: string;
+  note: string | null;
+  upstream: string;
+  inject_header: string;
+  credential_format: string;
+  is_active: number;
+  created_at: string;
+};
+
+/**
+ * Active Agent Vault secret including the value.
+ *
+ * Agent runtimes load this to place the value in an environment. An API secret
+ * goes to the nono parent only. The value must not be written into a profile,
+ * prompt, or response.
+ */
+export type BrokeredCredentialSecretRow = BrokeredCredentialPublicRow & {
+  secret: string;
+};
+
+/**
+ * Per-user nono choice stored in user preferences.
+ *
+ * Settings reads and writes it from the nono settings tab. The Claude broker
+ * reads it before launch and wraps Claude only when `enabled` is true. `allowedFolders`
+ * are extra absolute directories added to nono's filesystem allow list. The open
+ * project and Claude's own config directory are always allowed and are not stored here.
+ */
+export type NonoSettings = {
+  enabled: boolean;
+  allowedFolders: string[];
+};
+
 // ---------------------------
 //----------------- CHAT DRAFT QUEUE TYPES ------------
 /**

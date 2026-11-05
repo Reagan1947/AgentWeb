@@ -569,6 +569,24 @@ export const api = {
     toggleCredential: (credentialId: string, isActive: boolean) =>
       patch(`/api/settings/credentials/${credentialId}/toggle`, { isActive }),
 
+    nono: () => get('/api/settings/nono'),
+    saveNono: (settings: { enabled: boolean; allowedFolders: string[] }) =>
+      put('/api/settings/nono', settings),
+
+    brokeredCredentials: () => get('/api/settings/brokered-credentials'),
+    createBrokeredCredential: (payload: {
+      name: string;
+      note?: string;
+      upstream?: string;
+      injectHeader?: string;
+      credentialFormat?: string;
+      secret: string;
+    }) => post('/api/settings/brokered-credentials', payload),
+    deleteBrokeredCredential: (credentialId: number) =>
+      del(`/api/settings/brokered-credentials/${credentialId}`),
+    toggleBrokeredCredential: (credentialId: number, isActive: boolean) =>
+      patch(`/api/settings/brokered-credentials/${credentialId}/toggle`, { isActive }),
+
     notificationPreferences: () => get('/api/settings/notification-preferences'),
     saveNotificationPreferences: (preferences: unknown) =>
       put('/api/settings/notification-preferences', preferences),

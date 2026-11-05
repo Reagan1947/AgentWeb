@@ -30,6 +30,7 @@ import {
   CLAUDE_ULTRACODE_EFFORT
 } from '@/modules/providers/list/claude/claude-models.provider.js';
 import { resolveClaudeCodeExecutablePath } from '@/shared/claude-cli-path.js';
+import { applyClaudeNonoBroker } from '@/modules/providers/list/claude/claude-nono-broker.js';
 import {
   createNotificationEvent,
   notifyBackgroundWorkCompleted,
@@ -1105,6 +1106,33 @@ async function queryClaudeSDK(
       model: resolvedModel || options.model,
       effortModels,
     });
+
+    const brokerUserId = Number(ws?.userId);
+    if (Number.isInteger(brokerUserId) && brokerUserId > 0) {
+      try {
+        const broker = applyClaudeNonoBroker({
+          userId: brokerUserId,
+          claudeExecutable: typeof sdkOptions.pathToClaudeCodeExecutable === 'string'
+            ? sdkOptions.pathToClaudeCodeExecutable
+            : undefined,
+        });
+        if (broker) {
+          sdkOptions.env = { ...(sdkOptions.env || {}), ...broker.env };
+          if (broker.executablePath) {
+            sdkOptions.pathToClaudeCodeExecutable = broker.executablePath;
+          }
+          if (broker.promptAppend) {
+            sdkOptions.systemPrompt = {
+              type: 'preset',
+              preset: 'claude_code',
+              append: broker.promptAppend,
+            };
+          }
+        }
+      } catch (error) {
+        console.warn('[Claude] Failed to start the nono credential broker:', error);
+      }
+    }
 
     const mcpServers = await loadMcpConfig(options.cwd);
     if (mcpServers) {

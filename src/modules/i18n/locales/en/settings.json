@@ -129,6 +129,7 @@
     "commands": "Commands",
     "git": "Git",
     "apiTokens": "API & Tokens",
+    "nono": "nono",
     "voice": "Voice",
     "tasks": "Tasks",
     "browser": "Browser",
@@ -350,6 +351,30 @@
       "added": "Added:",
       "confirmDelete": "Are you sure you want to delete this GitHub token?"
     },
+    "brokered": {
+      "title": "Agent Vault",
+      "description": "Save secrets for your agents. Each entry is one secret — an API key, a token, a password, or anything else you do not want to paste into chat. You can save as many as you need. Active secrets are available to agents as environment variables, and agents are told not to reveal them.",
+      "nonoMissing": "nono is not installed on this server, so API secrets are stored but agents will not receive a stand-in token for those calls.",
+      "addButton": "Add secret",
+      "empty": "No secrets saved yet.",
+      "confirmDelete": "Delete this secret? Agents will no longer be able to use it.",
+      "created": "Added:",
+      "variables": "Brokered as {{baseUrl}} and {{token}}. The real secret stays on the server.",
+      "secretVariable": "Agents see {{variable}}.",
+      "form": {
+        "name": "Name (lowercase letters, numbers, underscores)",
+        "note": "What this secret is for (optional)",
+        "secret": "Secret",
+        "callApi": "Use this secret to call an HTTPS API",
+        "callApiHelp": "The server keeps the real value and gives the agent a stand-in token for that API.",
+        "upstream": "https://api.example.com",
+        "header": "Header name",
+        "formatBearer": "Authorization: Bearer",
+        "formatRaw": "Header value is the secret",
+        "addButton": "Save secret",
+        "cancelButton": "Cancel"
+      }
+    },
     "apiDocsLink": "API Documentation",
     "documentation": {
       "title": "External API Documentation",
@@ -360,6 +385,27 @@
     "version": {
       "updateAvailable": "Update available: v{{version}}"
     }
+  },
+  "nono": {
+    "sectionTitle": "nono",
+    "sectionDescription": "nono keeps API secrets on the server and limits which folders Claude can reach outside the open project.",
+    "enableLabel": "Enable nono",
+    "enableDescription": "Run Claude inside nono. API secrets are brokered only while this is on.",
+    "enableAriaLabel": "Enable nono",
+    "checking": "Checking...",
+    "statusInstalled": "nono is installed on this server.",
+    "statusMissing": "nono is not installed on this server. Settings are saved and take effect after it is installed.",
+    "statusWindows": "nono does not run on native Windows.",
+    "foldersTitle": "Accessible folders",
+    "foldersDescription": "The open project and Claude's own config directory stay available. Add any other folders Claude should be able to read and write.",
+    "folderPlaceholder": "/absolute/path/to/folder",
+    "addFolder": "Add folder",
+    "browseFolder": "Browse",
+    "removeFolder": "Remove folder",
+    "foldersEmpty": "No extra folders yet.",
+    "apiSecretsPaused": "nono is off, so these API secrets stay stored and are not given to Claude.",
+    "loadFailed": "Could not load nono settings.",
+    "saveFailed": "Could not save nono settings."
   },
   "tasks": {
     "checking": "Checking TaskMaster installation...",

@@ -3,6 +3,7 @@ export { closeConnection, getConnection, getDatabasePath } from '@/modules/datab
 export { apiKeysDb } from '@/modules/database/repositories/api-keys.js';
 export { appConfigDb } from '@/modules/database/repositories/app-config.js';
 export { credentialsDb } from '@/modules/database/repositories/credentials.js';
+export { brokeredCredentialsDb } from '@/modules/database/repositories/brokered-credentials.js';
 export { githubTokensDb } from '@/modules/database/repositories/github-tokens.js';
 export { notificationChannelEndpointsDb } from '@/modules/database/repositories/notification-channel-endpoints.js';
 export { notificationPreferencesDb } from '@/modules/database/repositories/notification-preferences.js';
@@ -20,7 +21,7 @@ export type {
 } from '@/modules/database/repositories/session-drafts.db.js';
 export { sessionsDb } from '@/modules/database/repositories/sessions.db.js';
 export { userDb } from '@/modules/database/repositories/users.js';
-// userPreferencesDb: used by the User module to persist the settings that used to live in browser localStorage.
+// userPreferencesDb: used by User for settings that used to live in browser localStorage, and by Settings and the Claude broker for the nono choice.
 export { userPreferencesDb } from '@/modules/database/repositories/user-preferences.db.js';
 export { vapidKeysDb } from '@/modules/database/repositories/vapid-keys.js';
 export { scheduledMessagesDb } from './repositories/scheduled-messages.db.js';

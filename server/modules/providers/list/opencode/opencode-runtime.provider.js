@@ -8,6 +8,7 @@ import {
   appendImagesInputTag,
   normalizeAttachmentDescriptors
 } from '@/shared/image-attachments.js';
+import { agentVaultProcessEnv } from '@/modules/providers/shared/agent-vault.js';
 import { notifyRunFailed, notifyRunStopped } from '@/modules/notifications/index.js';
 import { createCompleteMessage, createNormalizedMessage, flattenPromptForWindowsShell, getOpenCodeDatabasePath, stripAnsiSequences } from '@/shared/utils.js';
 
@@ -290,7 +291,7 @@ async function spawnOpenCode(command, options = {}, ws, context) {
       opencodeProcess = spawnFunction('opencode', args, {
         cwd: workingDir,
         stdio: ['pipe', 'pipe', 'pipe'],
-        env: { ...process.env, ...permissionOptions.env },
+        env: { ...process.env, ...permissionOptions.env, ...agentVaultProcessEnv(Number(ws?.userId)) },
       });
 
       activeOpenCodeProcesses.set(processKey, opencodeProcess);

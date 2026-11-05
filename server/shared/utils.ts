@@ -25,6 +25,7 @@ import type {
   ApiSuccessShape,
   AppErrorOptions,
   CliVersionProbe,
+  NonoSettings,
   NormalizedMessage,
   ProviderCurrentActiveModel,
   ProviderModelsDefinition,
@@ -42,6 +43,32 @@ import type {
  * Environment variables must be loaded before this module is evaluated.
  */
 export const IS_PLATFORM = process.env.VITE_IS_PLATFORM === 'true';
+
+/**
+ * Resolves an executable on PATH, or checks an absolute path.
+ *
+ * Settings uses this to report whether nono is installed. The Claude broker
+ * uses the same lookup so the launched path is the one the settings page
+ * described. Returns null when the file is missing or not executable.
+ */
+export function findExecutableOnPath(
+  command: string,
+  pathValue: string = process.env.PATH || '',
+): string | null {
+  const separator = path.delimiter;
+  const candidates = command.includes('/') || command.includes('\\')
+    ? [command]
+    : pathValue.split(separator).filter(Boolean).map((dir) => path.join(dir, command));
+  for (const candidate of candidates) {
+    try {
+      fs.accessSync(candidate, fs.constants.X_OK);
+      return candidate;
+    } catch {
+      // Keep looking through the remaining PATH entries.
+    }
+  }
+  return null;
+}
 
 // ---------------------------
 //----------------- NORMALIZED MESSAGE HELPER INPUT TYPES ------------
@@ -1518,4 +1545,146 @@ export function findApplicationRoot(startDirectory: string): string {
   return path.basename(parentDirectory) === 'dist-server'
     ? path.dirname(parentDirectory)
     : parentDirectory;
+}
+
+// ---------------------------
+//----------------- NONO SETTINGS ------------
+
+/** Preference key for `NonoSettings`. Settings persists it and the Claude broker reads it back. */
+export const NONO_SETTINGS_PREFERENCE_KEY = 'nonoSettings';
+
+const MAX_NONO_ALLOWED_FOLDERS = 32;
+const MAX_NONO_FOLDER_LENGTH = 1024;
+
+const DEFAULT_NONO_SETTINGS: NonoSettings = {
+  enabled: false,
+  allowedFolders: [],
+};
+
+/**
+ * Turns `~` and `$HOME` prefixes into an absolute path.
+ *
+ * nono also understands `$HOME` in a profile, but settings stores one canonical
+ * absolute path so the same folder cannot be listed twice under two spellings.
+ */
+function expandNonoHomePrefix(input: string): string {
+  if (input === '~') {
+    return os.homedir();
+  }
+  if (input.startsWith('~/') || input.startsWith('~\\')) {
+    return path.join(os.homedir(), input.slice(2));
+  }
+  if (input === '$HOME') {
+    return os.homedir();
+  }
+  if (input.startsWith('$HOME/') || input.startsWith('$HOME\\')) {
+    return path.join(os.homedir(), input.slice('$HOME'.length + 1));
+  }
+  return input;
+}
+
+/**
+ * Canonical absolute folder nono may be granted, or null when the path is not safe to store.
+ *
+ * Relative paths, the filesystem root, empty values, and NUL bytes are rejected.
+ * The Settings service reports that rejection to the client. The Claude broker
+ * drops the same values when a stored preference is unreadable rather than
+ * refusing to start Claude.
+ */
+function normalizeNonoAllowedFolder(input: string): string | null {
+  if (input.includes('\0') || input.length > MAX_NONO_FOLDER_LENGTH) {
+    return null;
+  }
+  const normalized = normalizeProjectPath(expandNonoHomePrefix(input.trim()));
+  if (!normalized || !path.isAbsolute(normalized)) {
+    return null;
+  }
+  if (normalized === path.parse(normalized).root) {
+    return null;
+  }
+  return normalized;
+}
+
+/**
+ * Reads a stored nono preference.
+ *
+ * A missing or corrupt value means nono is off and no extra folders are granted.
+ * Invalid folder entries are dropped so one bad path cannot discard the rest.
+ * Used by the Settings service when it returns the current choice, and by the
+ * Claude broker before it decides whether to wrap Claude.
+ */
+export function readNonoSettings(value: unknown): NonoSettings {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return { ...DEFAULT_NONO_SETTINGS };
+  }
+  const record = value as Record<string, unknown>;
+  const allowedFolders: string[] = [];
+  if (Array.isArray(record.allowedFolders)) {
+    for (const folder of record.allowedFolders) {
+      if (typeof folder !== 'string') {
+        continue;
+      }
+      const normalized = normalizeNonoAllowedFolder(folder);
+      if (!normalized || allowedFolders.includes(normalized)) {
+        continue;
+      }
+      allowedFolders.push(normalized);
+      if (allowedFolders.length >= MAX_NONO_ALLOWED_FOLDERS) {
+        break;
+      }
+    }
+  }
+  return {
+    enabled: record.enabled === true,
+    allowedFolders,
+  };
+}
+
+/**
+ * Validates a nono settings update from the settings tab.
+ *
+ * Both fields are required so a toggle and a folder edit cannot erase each other
+ * by sending a partial object. Throws `AppError` for a relative path, the
+ * filesystem root, or a list that is too long. The Settings service is the only caller.
+ */
+export function parseNonoSettingsUpdate(input: unknown): NonoSettings {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    throw new AppError('nono settings must be an object', {
+      code: 'NONO_SETTINGS_INVALID',
+      statusCode: 400,
+    });
+  }
+  const record = input as Record<string, unknown>;
+  if (typeof record.enabled !== 'boolean') {
+    throw new AppError('enabled must be a boolean', {
+      code: 'NONO_SETTINGS_INVALID',
+      statusCode: 400,
+    });
+  }
+  if (!Array.isArray(record.allowedFolders)) {
+    throw new AppError('allowedFolders must be a list of paths', {
+      code: 'NONO_SETTINGS_INVALID',
+      statusCode: 400,
+    });
+  }
+  if (record.allowedFolders.length > MAX_NONO_ALLOWED_FOLDERS) {
+    throw new AppError('Too many accessible folders', {
+      code: 'NONO_FOLDER_INVALID',
+      statusCode: 400,
+    });
+  }
+  const allowedFolders: string[] = [];
+  for (const folder of record.allowedFolders) {
+    const normalized = typeof folder === 'string' ? normalizeNonoAllowedFolder(folder) : null;
+    if (!normalized) {
+      throw new AppError('Accessible folders must be absolute paths, not the filesystem root', {
+        code: 'NONO_FOLDER_INVALID',
+        statusCode: 400,
+      });
+    }
+    if (!allowedFolders.includes(normalized)) {
+      allowedFolders.push(normalized);
+    }
+  }
+  return { enabled: record.enabled, allowedFolders };
 }

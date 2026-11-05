@@ -1,4 +1,5 @@
-import { AppError } from '@/shared/utils.js';
+import type { NonoSettings } from '@/shared/types.js';
+import { AppError, parseNonoSettingsUpdate, readNonoSettings } from '@/shared/utils.js';
 
 type ApiKeyRow = Record<string, unknown> & { api_key: string };
 type NotificationPreferences = Record<string, unknown> & {
@@ -24,6 +25,35 @@ type SettingsDependencies = {
     remove(userId: number, credentialId: number): boolean;
     toggle(userId: number, credentialId: number, isActive: boolean): boolean;
   };
+  brokeredCredentials: {
+    list(userId: number): Array<{
+      id: number;
+      name: string;
+      note?: string | null;
+      upstream: string;
+      inject_header: string;
+      credential_format: string;
+      is_active: number;
+      created_at: string;
+    }>;
+    create(input: {
+      userId: number;
+      name: string;
+      note: string | null;
+      upstream: string;
+      injectHeader: string;
+      credentialFormat: string;
+      secret: string;
+    }): { id: number; name: string };
+    remove(userId: number, credentialId: number): boolean;
+    toggle(userId: number, credentialId: number, isActive: boolean): boolean;
+  };
+  nonoAvailable(): boolean;
+  nonoSupported(): boolean;
+  nonoSettings: {
+    read(userId: number): unknown;
+    save(userId: number, settings: NonoSettings): void;
+  };
   notifications: {
     getPreferences(userId: number): NotificationPreferences | undefined;
     updatePreferences(userId: number, preferences: NotificationPreferences): unknown;
@@ -43,6 +73,35 @@ function requiredString(value: unknown, fieldName: string, code: string): string
     throw new AppError(`${fieldName} is required`, { code, statusCode: 400 });
   }
   return normalizedValue;
+}
+
+const BROKERED_NAME_PATTERN = /^[a-z][a-z0-9_]{0,31}$/;
+const BROKERED_HEADER_PATTERN = /^[A-Za-z0-9-]{1,64}$/;
+const BROKERED_FORMATS = new Set(['Bearer {}', '{}']);
+
+function brokeredEnvNames(name: string): { tokenEnv: string; baseUrlEnv: string } {
+  const prefix = name.toUpperCase();
+  return { tokenEnv: `${prefix}_TOKEN`, baseUrlEnv: `${prefix}_BASE_URL` };
+}
+
+function normalizeUpstream(value: string): string {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new AppError('Upstream must be an https URL', {
+      code: 'BROKERED_UPSTREAM_INVALID',
+      statusCode: 400,
+    });
+  }
+  if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash) {
+    throw new AppError('Upstream must be an https URL without credentials or a query', {
+      code: 'BROKERED_UPSTREAM_INVALID',
+      statusCode: 400,
+    });
+  }
+  const pathname = url.pathname === '/' ? '' : url.pathname.replace(/\/$/, '');
+  return `${url.origin}${pathname}`;
 }
 
 function assertFound(found: boolean, resourceName: string, code: string): void {
@@ -121,6 +180,135 @@ export function createSettingsService(dependencies: SettingsDependencies) {
         dependencies.credentials.remove(userId, credentialId),
         'Credential',
         'CREDENTIAL_NOT_FOUND',
+      );
+      return { success: true };
+    },
+    listBrokeredCredentials(userId: number) {
+      const credentials = dependencies.brokeredCredentials.list(userId).map((row) => {
+        const isApi = row.upstream.trim().length > 0;
+        const envNames = brokeredEnvNames(row.name);
+        return {
+          id: row.id,
+          name: row.name,
+          note: row.note?.trim() || null,
+          upstream: row.upstream,
+          injectHeader: row.inject_header,
+          credentialFormat: row.credential_format,
+          isActive: row.is_active === 1,
+          createdAt: row.created_at,
+          kind: isApi ? 'api' as const : 'secret' as const,
+          tokenEnv: isApi ? envNames.tokenEnv : row.name.toUpperCase(),
+          baseUrlEnv: isApi ? envNames.baseUrlEnv : '',
+        };
+      });
+      return { credentials, nonoAvailable: dependencies.nonoAvailable() };
+    },
+    getNonoSettings(userId: number) {
+      return {
+        ...readNonoSettings(dependencies.nonoSettings.read(userId)),
+        available: dependencies.nonoAvailable(),
+        supported: dependencies.nonoSupported(),
+      };
+    },
+    updateNonoSettings(userId: number, input: unknown) {
+      const settings = parseNonoSettingsUpdate(input);
+      dependencies.nonoSettings.save(userId, settings);
+      return {
+        ...settings,
+        available: dependencies.nonoAvailable(),
+        supported: dependencies.nonoSupported(),
+      };
+    },
+    createBrokeredCredential(userId: number, input: Record<string, unknown>) {
+      const name = requiredString(input.name, 'Name', 'BROKERED_NAME_REQUIRED');
+      if (!BROKERED_NAME_PATTERN.test(name)) {
+        throw new AppError('Name must be a lowercase identifier using letters, numbers, and underscores', {
+          code: 'BROKERED_NAME_INVALID',
+          statusCode: 400,
+        });
+      }
+      const note = typeof input.note === 'string' ? input.note.trim() : '';
+      if (note.length > 240) {
+        throw new AppError('Note is too long', {
+          code: 'BROKERED_NOTE_INVALID',
+          statusCode: 400,
+        });
+      }
+      const upstreamInput = typeof input.upstream === 'string' ? input.upstream.trim() : '';
+      let upstream = '';
+      let injectHeader = '';
+      let credentialFormat = '';
+      if (upstreamInput) {
+        upstream = normalizeUpstream(upstreamInput);
+        injectHeader = requiredString(input.injectHeader, 'Header', 'BROKERED_HEADER_REQUIRED');
+        if (!BROKERED_HEADER_PATTERN.test(injectHeader)) {
+          throw new AppError('Header name is invalid', {
+            code: 'BROKERED_HEADER_INVALID',
+            statusCode: 400,
+          });
+        }
+        credentialFormat = requiredString(
+          input.credentialFormat,
+          'Credential format',
+          'BROKERED_FORMAT_REQUIRED',
+        );
+        if (!BROKERED_FORMATS.has(credentialFormat)) {
+          throw new AppError('Credential format must be "Bearer {}" or "{}"', {
+            code: 'BROKERED_FORMAT_INVALID',
+            statusCode: 400,
+          });
+        }
+      }
+      const secret = requiredString(input.secret, 'Secret', 'BROKERED_SECRET_REQUIRED');
+      if (secret.length > 8192) {
+        throw new AppError('Secret is too long', {
+          code: 'BROKERED_SECRET_INVALID',
+          statusCode: 400,
+        });
+      }
+      try {
+        const created = dependencies.brokeredCredentials.create({
+          userId,
+          name,
+          note: note || null,
+          upstream,
+          injectHeader,
+          credentialFormat,
+          secret,
+        });
+        return { success: true, credential: { id: created.id, name: created.name } };
+      } catch (error) {
+        const code = typeof error === 'object' && error !== null && 'code' in error
+          ? String((error as { code?: unknown }).code)
+          : '';
+        if (code.includes('CONSTRAINT')) {
+          throw new AppError('A credential with this name already exists', {
+            code: 'BROKERED_CREDENTIAL_EXISTS',
+            statusCode: 409,
+          });
+        }
+        throw error;
+      }
+    },
+    deleteBrokeredCredential(userId: number, credentialId: number) {
+      assertFound(
+        dependencies.brokeredCredentials.remove(userId, credentialId),
+        'Brokered credential',
+        'BROKERED_CREDENTIAL_NOT_FOUND',
+      );
+      return { success: true };
+    },
+    toggleBrokeredCredential(userId: number, credentialId: number, isActive: unknown) {
+      if (typeof isActive !== 'boolean') {
+        throw new AppError('isActive must be a boolean', {
+          code: 'INVALID_ACTIVE_STATE',
+          statusCode: 400,
+        });
+      }
+      assertFound(
+        dependencies.brokeredCredentials.toggle(userId, credentialId, isActive),
+        'Brokered credential',
+        'BROKERED_CREDENTIAL_NOT_FOUND',
       );
       return { success: true };
     },

@@ -22,6 +22,7 @@ import {
   createNormalizedMessage,
 } from '@/shared/index.js';
 import { notifyRunFailed, notifyRunStopped } from '@/modules/notifications/index.js';
+import { codexEnvWithAgentVault } from '@/modules/providers/shared/agent-vault.js';
 import type { AnyRecord, ProviderRuntimeContext, ProviderRuntimeWriter } from '@/shared/index.js';
 
 type ActiveCodexSession = {
@@ -308,7 +309,8 @@ async function queryCodex(
   const sessionKey = () => sessionId || capturedSessionId || null;
 
   try {
-    codex = new Codex();
+    const vaultEnv = codexEnvWithAgentVault(Number(ws?.userId));
+    codex = new Codex(vaultEnv ? { env: vaultEnv } : undefined);
 
     const threadOptions: ThreadOptions = {
       workingDirectory,

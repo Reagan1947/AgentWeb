@@ -82,6 +82,7 @@ type CursorAcpRunInput = {
   processes: Map<string, CursorProcess>;
   spawnImpl: SpawnCursor;
   isInstalled?: () => Promise<boolean>;
+  extraEnv?: NodeJS.ProcessEnv;
 };
 
 const pendingApprovals = new Map<string, ApprovalEntry>();
@@ -338,7 +339,7 @@ export async function runCursorAcpSession(input: CursorAcpRunInput): Promise<voi
   const child = input.spawnImpl('cursor-agent', ACP_ARGS, {
     cwd,
     stdio: ['pipe', 'pipe', 'pipe'],
-    env: { ...process.env },
+    env: { ...process.env, ...input.extraEnv },
   });
   input.processes.set(processKey, child);
 

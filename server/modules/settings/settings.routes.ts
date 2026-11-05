@@ -38,6 +38,18 @@ export function createSettingsRouter(
   router.patch('/credentials/:credentialId/toggle', respond((req) => service.toggleCredential(
     userId(req), Number(req.params.credentialId), req.body?.isActive,
   )));
+  router.get('/nono', respond((req) => service.getNonoSettings(userId(req))));
+  router.put('/nono', respond((req) => service.updateNonoSettings(userId(req), req.body ?? {})));
+  router.get('/brokered-credentials', respond((req) => service.listBrokeredCredentials(userId(req))));
+  router.post('/brokered-credentials', respond((req) => service.createBrokeredCredential(
+    userId(req), req.body ?? {},
+  )));
+  router.delete('/brokered-credentials/:credentialId', respond((req) => service.deleteBrokeredCredential(
+    userId(req), Number(req.params.credentialId),
+  )));
+  router.patch('/brokered-credentials/:credentialId/toggle', respond((req) => service.toggleBrokeredCredential(
+    userId(req), Number(req.params.credentialId), req.body?.isActive,
+  )));
   router.get('/notification-preferences', respond((req) => service.getNotificationPreferences(userId(req))));
   router.put('/notification-preferences', respond((req) => service.updateNotificationPreferences(
     userId(req), req.body ?? {},

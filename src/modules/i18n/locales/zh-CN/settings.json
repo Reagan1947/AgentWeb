@@ -129,6 +129,7 @@
     "commands": "命令",
     "git": "Git",
     "apiTokens": "API 和令牌",
+    "nono": "nono",
     "voice": "语音",
     "tasks": "任务",
     "browser": "浏览器",
@@ -328,6 +329,30 @@
       "added": "添加时间：",
       "confirmDelete": "确定要删除此 GitHub 令牌吗？"
     },
+    "brokered": {
+      "title": "Agent Vault",
+      "description": "把想交给智能体使用的秘密保存在这里。可以是 API 密钥、令牌、密码，或任何不想直接贴进对话的内容。可以保存多条。已启用的秘密会以环境变量交给智能体，并要求它们不要泄露这些值。",
+      "nonoMissing": "这台服务器还没安装 nono，已保存的接口秘密不会以临时代币交给智能体。",
+      "addButton": "添加秘密",
+      "empty": "还没有保存的秘密。",
+      "confirmDelete": "删除这条秘密？智能体之后将不能再使用它。",
+      "created": "添加时间：",
+      "variables": "通过 {{baseUrl}} 和 {{token}} 代为调用。真实秘密留在服务器上。",
+      "secretVariable": "智能体看到的是 {{variable}}。",
+      "form": {
+        "name": "名称（小写字母、数字、下划线）",
+        "note": "这条秘密是做什么的（可选）",
+        "secret": "秘密内容",
+        "callApi": "用这条秘密调用 HTTPS 接口",
+        "callApiHelp": "服务器保管真实内容，只给智能体一个临时代币去调用该接口。",
+        "upstream": "https://api.example.com",
+        "header": "请求头名称",
+        "formatBearer": "Authorization: Bearer",
+        "formatRaw": "请求头的值就是秘密",
+        "addButton": "保存",
+        "cancelButton": "取消"
+      }
+    },
     "apiDocsLink": "API 文档",
     "documentation": {
       "title": "外部 API 文档",
@@ -338,6 +363,27 @@
     "version": {
       "updateAvailable": "有可用更新：v{{version}}"
     }
+  },
+  "nono": {
+    "sectionTitle": "nono",
+    "sectionDescription": "nono 把接口秘密留在服务器上，并限制 Claude 在当前项目之外能访问哪些文件夹。",
+    "enableLabel": "启用 nono",
+    "enableDescription": "在 nono 里运行 Claude。只有打开这项时，接口秘密才会交给 nono 代理。",
+    "enableAriaLabel": "启用 nono",
+    "checking": "正在检查...",
+    "statusInstalled": "这台服务器已安装 nono。",
+    "statusMissing": "这台服务器还没安装 nono。设置仍会保存，安装后才会生效。",
+    "statusWindows": "nono 不能在原生 Windows 上运行。",
+    "foldersTitle": "可访问文件夹",
+    "foldersDescription": "当前打开的项目和 Claude 自己的配置目录始终可用。在这里添加它还需要读写的其他文件夹。",
+    "folderPlaceholder": "文件夹的绝对路径",
+    "addFolder": "添加文件夹",
+    "browseFolder": "浏览",
+    "removeFolder": "移除文件夹",
+    "foldersEmpty": "还没有额外文件夹。",
+    "apiSecretsPaused": "nono 已关闭，这些接口秘密仍会保存，但不会交给 Claude。",
+    "loadFailed": "没能加载 nono 设置。",
+    "saveFailed": "没能保存 nono 设置。"
   },
   "tasks": {
     "checking": "正在检查 TaskMaster 安装...",

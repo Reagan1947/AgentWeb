@@ -1,9 +1,12 @@
 import {
   apiKeysDb,
+  brokeredCredentialsDb,
   credentialsDb,
   notificationPreferencesDb,
   pushSubscriptionsDb,
+  userPreferencesDb,
 } from '@/modules/database/index.js';
+import { findExecutableOnPath, NONO_SETTINGS_PREFERENCE_KEY } from '@/shared/utils.js';
 import {
   createNotificationEvent,
   getPublicKey,
@@ -27,6 +30,21 @@ const settingsService = createSettingsService({
     remove: (userId, credentialId) => credentialsDb.deleteCredential(userId, credentialId),
     toggle: (userId, credentialId, isActive) =>
       credentialsDb.toggleCredential(userId, credentialId, isActive),
+  },
+  brokeredCredentials: {
+    list: (userId) => brokeredCredentialsDb.listPublic(userId),
+    create: (input) => brokeredCredentialsDb.create(input),
+    remove: (userId, credentialId) => brokeredCredentialsDb.delete(userId, credentialId),
+    toggle: (userId, credentialId, isActive) =>
+      brokeredCredentialsDb.toggle(userId, credentialId, isActive),
+  },
+  nonoAvailable: () => findExecutableOnPath('nono') !== null,
+  nonoSupported: () => process.platform !== 'win32',
+  nonoSettings: {
+    read: (userId) => userPreferencesDb.getPreferences(userId)[NONO_SETTINGS_PREFERENCE_KEY],
+    save: (userId, settings) => userPreferencesDb.savePreferences(userId, {
+      [NONO_SETTINGS_PREFERENCE_KEY]: settings,
+    }),
   },
   notifications: {
     getPreferences: (userId) => notificationPreferencesDb.getPreferences(userId),

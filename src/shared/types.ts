@@ -1428,7 +1428,7 @@ export type AgentContext = {
 };
 
 /** Identifier of a top-level section in the settings dialog; use it whenever a tab is stored, compared or requested so deep links, the sidebar and the command palette all agree on the same set of names. */
-export type SettingsMainTab = 'agents' | 'appearance' | 'commands' | 'git' | 'api' | 'voice' | 'tasks' | 'browser' | 'notifications' | 'plugins' | 'about';
+export type SettingsMainTab = 'agents' | 'appearance' | 'commands' | 'git' | 'api' | 'nono' | 'voice' | 'tasks' | 'browser' | 'notifications' | 'plugins' | 'about';
 
 /** The coding-agent CLI a settings screen is configuring, aliasing LLMProvider so agent-scoped settings read as being about an agent rather than a chat model. */
 export type AgentProvider = LLMProvider;
@@ -1514,6 +1514,21 @@ export type CreatedApiKey = {
   keyName: string;
   apiKey: string;
   createdAt?: string;
+};
+
+/** One Agent Vault secret as the settings page lists it. The value is never included. `kind` is `api` when the secret is brokered to an https API; otherwise agents receive `tokenEnv` directly. */
+export type BrokeredCredentialItem = {
+  id: number;
+  name: string;
+  note: string | null;
+  upstream: string;
+  injectHeader: string;
+  credentialFormat: string;
+  isActive: boolean;
+  createdAt: string;
+  kind: 'api' | 'secret';
+  tokenEnv: string;
+  baseUrlEnv: string;
 };
 
 /** One stored GitHub credential as the server returns it, in snake_case, carrying its name, optional description, creation timestamp and active flag - never the token itself. */
