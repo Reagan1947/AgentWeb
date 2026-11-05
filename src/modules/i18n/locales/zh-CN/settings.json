@@ -129,7 +129,7 @@
     "commands": "命令",
     "git": "Git",
     "apiTokens": "API 和令牌",
-    "nono": "nono",
+    "nono": "Nono",
     "voice": "语音",
     "tasks": "任务",
     "browser": "浏览器",
@@ -365,7 +365,7 @@
     }
   },
   "nono": {
-    "sectionTitle": "nono",
+    "sectionTitle": "Nono",
     "sectionDescription": "nono 把接口秘密留在服务器上，并限制 Claude 在当前项目之外能访问哪些文件夹。它只作用于 Claude 会话：Shell 标签页、文件树和其他智能体不受限制。",
     "enableLabel": "启用 nono",
     "enableDescription": "在 nono 里运行 Claude。只有打开这项时，接口秘密才会交给 nono 代理。",

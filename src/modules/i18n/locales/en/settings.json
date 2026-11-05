@@ -129,7 +129,7 @@
     "commands": "Commands",
     "git": "Git",
     "apiTokens": "API & Tokens",
-    "nono": "nono",
+    "nono": "Nono",
     "voice": "Voice",
     "tasks": "Tasks",
     "browser": "Browser",
@@ -387,7 +387,7 @@
     }
   },
   "nono": {
-    "sectionTitle": "nono",
+    "sectionTitle": "Nono",
     "sectionDescription": "nono keeps API secrets on the server and limits which folders Claude can reach outside the open project. It applies to Claude sessions only: the Shell tab, the file tree, and other agents are not restricted.",
     "enableLabel": "Enable nono",
     "enableDescription": "Run Claude inside nono. API secrets are brokered only while this is on.",

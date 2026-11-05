@@ -9,7 +9,7 @@ import SettingsSection from '@/modules/settings/SettingsSection';
 import SettingsToggle from '@/modules/settings/SettingsToggle';
 import { FolderBrowserModal } from '@/modules/project-creation-wizard';
 import { api, readApiJson } from '@/shared/api';
-import { Button, Input } from '@/shared/ui';
+import { Button, InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@/shared/ui';
 
 type NonoSettings = {
   enabled: boolean;
@@ -23,7 +23,7 @@ export default function NonoSettingsTab() {
   const { t } = useTranslation('settings');
   // Server copy of the nono choice. Null until the first load so the switch does not flash off.
   const [settings, setSettings] = useState<NonoSettings | null>(null);
-  // Path typed into the add-folder field. Saved only when the user adds it.
+  // Path typed or browsed into the add-folder field. Saved only when the user adds it.
   const [folderDraft, setFolderDraft] = useState('');
   // The folder browser sits above this dialog while the user picks an extra folder.
   const [browserOpen, setBrowserOpen] = useState(false);
@@ -168,38 +168,39 @@ export default function NonoSettingsTab() {
         <SettingsCard divided>
           <div className="space-y-3 px-4 py-4">
             <div className="flex flex-col gap-2 sm:flex-row">
-              <Input
-                value={folderDraft}
-                placeholder={t('nono.folderPlaceholder')}
-                disabled={isLoading || isSaving || !settings}
-                onChange={(event) => setFolderDraft(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') {
-                    event.preventDefault();
-                    void addFolder(folderDraft);
-                  }
-                }}
-              />
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={() => void addFolder(folderDraft)}
-                  disabled={isSaving || !settings || !folderDraft.trim()}
-                >
-                  {t('nono.addFolder')}
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setBrowserOpen(true)}
-                  disabled={isSaving || !settings}
-                >
-                  <FolderOpen className="h-4 w-4" />
-                  {t('nono.browseFolder')}
-                </Button>
-              </div>
+              <InputGroup className="flex-1">
+                <InputGroupInput
+                  value={folderDraft}
+                  placeholder={t('nono.folderPlaceholder')}
+                  disabled={isLoading || isSaving || !settings}
+                  onChange={(event) => setFolderDraft(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      void addFolder(folderDraft);
+                    }
+                  }}
+                />
+                <InputGroupAddon align="inline-end">
+                  <InputGroupButton
+                    size="icon-xs"
+                    aria-label={t('nono.browseFolder')}
+                    title={t('nono.browseFolder')}
+                    onClick={() => setBrowserOpen(true)}
+                    disabled={isSaving || !settings}
+                  >
+                    <FolderOpen className="size-4" />
+                  </InputGroupButton>
+                </InputGroupAddon>
+              </InputGroup>
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => void addFolder(folderDraft)}
+                disabled={isSaving || !settings || !folderDraft.trim()}
+              >
+                {t('nono.addFolder')}
+              </Button>
             </div>
             {!settings || settings.allowedFolders.length === 0 ? (
               <p className="text-sm italic text-muted-foreground">
@@ -243,7 +244,8 @@ export default function NonoSettingsTab() {
         onClose={() => setBrowserOpen(false)}
         onFolderSelected={(folderPath) => {
           setBrowserOpen(false);
-          void addFolder(folderPath);
+          // Left in the field so the user confirms it with Add folder.
+          setFolderDraft(folderPath);
         }}
       />
     </div>
