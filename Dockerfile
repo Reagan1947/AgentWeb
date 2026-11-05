@@ -33,7 +33,8 @@ RUN bash /tmp/extra-tools.sh "$OPTIONAL_TOOLS" && rm -f /tmp/extra-tools.sh
 # The node image already owns UID 1000 as `node`, so reuse or create the account.
 RUN if ! getent passwd "$AGENT_UID" >/dev/null; then useradd -m -u "$AGENT_UID" -s /bin/bash agent; \
     else usermod -l agent -d /home/agent -m "$(getent passwd "$AGENT_UID" | cut -d: -f1)"; fi \
-  && mkdir -p /workspace && chown agent /workspace
+  && mkdir -p /workspace && chown agent /workspace \
+  && ln -sf /home/agent/.machine-id /etc/machine-id
 COPY --from=build --chown=agent /app /app
 USER agent
 WORKDIR /app
@@ -44,4 +45,6 @@ ENV AGENTWEB_NONO_READ_PATHS=/usr/share:/etc/maven:/opt/megacmd AGENTWEB_NONO_AL
 EXPOSE 3001
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s \
   CMD curl -fsS "http://127.0.0.1:${SERVER_PORT}/health" || exit 1
-CMD ["node", "dist-server/server/index.js"]
+# Containers have no machine id, and tools such as mega-sync use it as a device id. It lives in
+# the home volume because a rebuilt container must keep it, or those tools see a new device.
+CMD ["sh", "-c", "[ -s \"$HOME/.machine-id\" ] || tr -d - < /proc/sys/kernel/random/uuid > \"$HOME/.machine-id\"; exec node dist-server/server/index.js"]

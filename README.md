@@ -94,8 +94,10 @@ Open `http://localhost:3001` and set a password on the first visit. To sign in t
 
 | `.env` variable | Default | Purpose |
 |---|---|---|
-| `BIND_ADDRESS` | `127.0.0.1` | Interface for the published ports. Use `0.0.0.0` to connect from another machine. |
-| `PUBLIC_HOST` | `localhost` | The host your browser uses to reach this machine. Steel's live view loads from it. |
+| `BIND_ADDRESS` | `127.0.0.1` | Interface for the direct ports 3001 and 3000. Leave this unless you know you need otherwise. |
+| `STEEL_DOMAIN` | `localhost:3000` | The address your browser uses for Steel. Its live view loads from here. |
+| `STEEL_USE_SSL` | `false` | Set to `true` when `STEEL_DOMAIN` is served over HTTPS. |
+| `PUBLIC_DOMAIN` | empty | Your domain, used with HTTPS below. |
 | `AGENTWEB_PORT` | `3001` | Host port for the web UI. |
 | `WORKSPACE_DIR` | `./workspace` | Host folder mounted at `/workspace`, where projects live. |
 | `AGENT_UID` | `1000` | Container user ID. Must be able to write to `WORKSPACE_DIR`. |
@@ -103,9 +105,24 @@ Open `http://localhost:3001` and set a password on the first visit. To sign in t
 
 The image includes common development tools, because agents cannot install system packages themselves: `gh`, `pnpm`, `bun`, `uv`, Python `pip` and `venv`, Go, database clients, and MEGAcmd. To add JDK 8 or 17 with Maven, set `OPTIONAL_TOOLS=jdk8,jdk17` in `.env`. JDK 17 is then the default; point `JAVA_HOME` at `$JDK8_HOME` to switch. To add anything else, edit `docker/extra-tools.sh`. Rebuild after either change.
 
-Steel shares the AgentWeb container's network, so its Chrome can open dev servers your agents start. Agents cannot use ports 3000 or 9223. Accounts, Claude sign-in, and settings are kept in the `agent-home` volume.
+Steel shares the AgentWeb container's network, so its Chrome can open dev servers your agents start. Agents cannot use ports 3000 or 9223. Steel is built from a pinned commit, because it only publishes a `latest` image and the next commit breaks the live view. Change `STEEL_REF` to move it. Accounts, Claude sign-in, and settings are kept in the `agent-home` volume.
 
-Port 3000 and 9223 have no login of their own: anyone who reaches them can control the browser. Check this before you set `BIND_ADDRESS=0.0.0.0` on a machine with a public address.
+Steel has no login of its own: anyone who reaches port 3000 can control the browser. Do not set `BIND_ADDRESS=0.0.0.0` on a machine with a public address. Use HTTPS instead.
+
+#### HTTPS with a domain
+
+1. Point your domain and `steel.<domain>` at the machine, and open ports 80 and 443 in its firewall.
+2. Add this to `.env`, then run `docker compose up -d`:
+
+```bash
+COMPOSE_PROFILES=https
+PUBLIC_DOMAIN=example.com
+STEEL_DOMAIN=steel.example.com
+STEEL_USE_SSL=true
+BIND_ADDRESS=127.0.0.1
+```
+
+Caddy obtains and renews the certificates. It checks your AgentWeb sign-in before serving Steel, using a cookie set for the domain. Only ports 80 and 443 are public. Through an SSH tunnel, AgentWeb is still at `127.0.0.1:3001`.
 
 ## Configuration
 

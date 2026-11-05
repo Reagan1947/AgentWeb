@@ -2,7 +2,7 @@ import { createRequire } from 'node:module';
 
 import { getConnection, userDb } from '@/modules/database/index.js';
 
-import { authenticateToken, generateToken } from './auth.middleware.js';
+import { authenticateToken, generateToken, proxySession } from './auth.middleware.js';
 import { createAuthRouter } from './auth.routes.js';
 import { createAuthService } from './auth.service.js';
 
@@ -35,4 +35,10 @@ const authService = createAuthService({
 });
 
 /** Auth router assembled for the server entrypoint. */
-export const authRoutes = createAuthRouter(authService, authenticateToken);
+export const authRoutes = createAuthRouter(authService, authenticateToken, {
+  isSignedIn: (cookieHeader) => {
+    const userId = proxySession.verifiedUserId(cookieHeader);
+    return userId !== null && Boolean(userDb.getUserById(userId));
+  },
+  clear: (response) => proxySession.clear(response),
+});

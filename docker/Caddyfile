@@ -1,0 +1,20 @@
+# Public entry point for `COMPOSE_PROFILES=https`. Caddy obtains and renews the certificates.
+{$PUBLIC_DOMAIN} {
+	reverse_proxy app:3001
+}
+
+www.{$PUBLIC_DOMAIN} {
+	redir https://{$PUBLIC_DOMAIN}{uri} permanent
+}
+
+# Steel has no login of its own, so AgentWeb checks the sign-in on every request.
+{$STEEL_DOMAIN} {
+	forward_auth app:3001 {
+		uri /api/auth/proxy-verify
+		# The check is a plain request even when it guards a WebSocket. AgentWeb would
+		# otherwise treat it as a connection to its own WebSocket server.
+		header_up -Connection
+		header_up -Upgrade
+	}
+	reverse_proxy app:3000
+}

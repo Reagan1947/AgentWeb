@@ -74,6 +74,8 @@ export function buildBrokeredNonoProfile(input: {
   allowedFolders?: string[];
   /** Folders a sandboxed process needs to read: the Node install and the AgentWeb MCP entry. */
   readFolders?: string[];
+  /** Single files a sandboxed process needs to read. pip checks the OS version, for example. */
+  readFiles?: string[];
   /** The server's own port. Browser MCP tools call it directly once API secrets turn on nono's proxy. */
   serverPort?: number;
 }): { profile: Record<string, unknown>; promptAppend: string } {
@@ -118,6 +120,7 @@ export function buildBrokeredNonoProfile(input: {
         allow: [...new Set(['$HOME/.claude', input.claudeTempDir, ...allowedFolders])],
         allow_file: ['$HOME/.claude.json', '$HOME/.claude.json.lock'],
         read: [...new Set(input.readFolders ?? [])],
+        read_file: [...new Set(input.readFiles ?? [])],
       },
       network: {
         credentials: apiCredentials.map((credential) => credential.name),
@@ -233,6 +236,17 @@ function ensureToolWriteFolders(): string[] {
     fs.mkdirSync(folder, { recursive: true });
   }
   return folders;
+}
+
+/**
+ * Existing files from this list, each with its symlink target. Landlock checks the
+ * target, and /etc/machine-id and /etc/os-release are commonly symlinks.
+ * Used by the Claude broker and its tests.
+ */
+export function resolveToolReadFiles(files: string[]): string[] {
+  return files
+    .filter((file) => fs.existsSync(file))
+    .flatMap((file) => [file, fs.realpathSync(file)]);
 }
 
 /** Nearest folder above this module that holds package.json. The browser MCP entry lives under it. */
@@ -367,6 +381,7 @@ export async function applyClaudeNonoBroker(input: {
         .filter((folder) => !isNonoFolderCoveringHome(folder)),
       ...parseNonoPathList(process.env.AGENTWEB_NONO_READ_PATHS),
     ],
+    readFiles: resolveToolReadFiles(['/etc/os-release', '/etc/debian_version', '/etc/machine-id']),
     serverPort: Number.parseInt(process.env.SERVER_PORT || process.env.PORT || '3001', 10),
   });
   const serialized = JSON.stringify(built.profile);

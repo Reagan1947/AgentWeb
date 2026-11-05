@@ -350,8 +350,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
   );
 
   const logout = useCallback(() => {
-    // JWT logout is client-side: the server endpoint does not maintain a
-    // revocation list, so clearing the session is the complete operation.
+    // JWT logout is client-side: the server keeps no revocation list. The request
+    // only clears the reverse proxy cookie, so a failure must not block signing out.
+    void api.auth.logout().catch(() => undefined);
     clearSession();
   }, [clearSession]);
 

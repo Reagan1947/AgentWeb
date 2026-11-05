@@ -4,9 +4,15 @@ import jwt from 'jsonwebtoken';
 import { IS_PLATFORM } from '@/shared/utils.js';
 
 import { userDb, appConfigDb } from '../database/index.js';
+import { createProxySession } from './proxy-session.js';
 
 // Use env var if set, otherwise auto-generate a unique secret per installation
 const JWT_SECRET = process.env.JWT_SECRET || appConfigDb.getOrCreateJwtSecret();
+
+const proxySession = createProxySession({
+  jwtSecret: JWT_SECRET,
+  cookieDomain: process.env.AUTH_PROXY_COOKIE_DOMAIN,
+});
 
 // Optional API key middleware
 const validateApiKey = (req, res, next) => {
@@ -78,6 +84,8 @@ const authenticateToken = async (req, res, next) => {
         res.setHeader('X-Refreshed-Token', newToken);
       }
     }
+
+    proxySession.issueIfNeeded(req.headers.cookie, res, user.id);
 
     req.user = user;
     next();
@@ -159,5 +167,6 @@ export {
   authenticateToken,
   generateToken,
   authenticateWebSocket,
-  JWT_SECRET
+  JWT_SECRET,
+  proxySession
 };

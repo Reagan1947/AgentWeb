@@ -201,6 +201,7 @@ export const api = {
   // Auth endpoints (no token required)
   auth: {
     status: () => fetch('/api/auth/status'),
+    logout: () => authenticatedFetch('/api/auth/logout', { method: 'POST' }),
     login: (username: string, password: string) => fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

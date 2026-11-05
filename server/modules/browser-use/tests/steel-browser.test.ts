@@ -234,3 +234,29 @@ test('releasing a current Steel session stops after the release endpoint succeed
   });
   assert.deepEqual(calls, ['POST http://127.0.0.1:3000/v1/sessions/steel-3/release']);
 });
+
+test('launchAgentBrowser reaches self-hosted Steel through its configured address, not its public DOMAIN', async () => {
+  let connectedTo = '';
+  const launched = await launchAgentBrowser({
+    playwright: {
+      chromium: {
+        connectOverCDP: async (websocketUrl: string) => {
+          connectedTo = websocketUrl;
+          return { contexts: () => [{ pages: () => [{}] }] };
+        },
+      },
+    },
+    steelBaseUrl: 'http://127.0.0.1:3000',
+    steelApiKey: '',
+    profilePath: null,
+    viewport: { width: 1280, height: 800 },
+    allowLocalFallback: true,
+    fetchImpl: async () => new Response(JSON.stringify({
+      id: '8604b5d9-43be-4a33-8d23-ab65f25e26e6',
+      websocketUrl: 'wss://steel.example.com/',
+      debugUrl: 'https://steel.example.com/v1/sessions/debug',
+    }), { status: 200 }),
+  });
+  assert.equal(connectedTo, 'ws://127.0.0.1:3000/');
+  assert.match(String(launched.debugUrl), /^https:\/\/steel\.example\.com\//);
+});

@@ -94,8 +94,10 @@ docker compose up -d --build
 
 | `.env` 变量 | 默认值 | 用途 |
 |---|---|---|
-| `BIND_ADDRESS` | `127.0.0.1` | 发布端口监听的网卡。要从其他机器访问时填 `0.0.0.0`。 |
-| `PUBLIC_HOST` | `localhost` | 浏览器访问这台机器用的主机名。Steel 的实时画面从这里加载。 |
+| `BIND_ADDRESS` | `127.0.0.1` | 直连端口 3001 和 3000 监听的网卡。除非明确需要，否则不要改。 |
+| `STEEL_DOMAIN` | `localhost:3000` | 浏览器访问 Steel 用的地址。实时画面从这里加载。 |
+| `STEEL_USE_SSL` | `false` | `STEEL_DOMAIN` 走 HTTPS 时设为 `true`。 |
+| `PUBLIC_DOMAIN` | 空 | 你的域名，配合下面的 HTTPS 使用。 |
 | `AGENTWEB_PORT` | `3001` | 网页界面在宿主机上的端口。 |
 | `WORKSPACE_DIR` | `./workspace` | 挂载到 `/workspace` 的宿主机文件夹，项目放在这里。 |
 | `AGENT_UID` | `1000` | 容器用户的 ID，需要对 `WORKSPACE_DIR` 有写权限。 |
@@ -103,9 +105,24 @@ docker compose up -d --build
 
 镜像预装了常用开发工具，因为代理自己无法安装系统软件：`gh`、`pnpm`、`bun`、`uv`、Python 的 `pip` 和 `venv`、Go、数据库客户端和 MEGAcmd。要加入 JDK 8 或 17（附带 Maven），在 `.env` 里设置 `OPTIONAL_TOOLS=jdk8,jdk17`。此时默认使用 JDK 17，把 `JAVA_HOME` 指向 `$JDK8_HOME` 即可切换。要加其他工具，修改 `docker/extra-tools.sh`。改完都需要重新构建。
 
-Steel 和 AgentWeb 容器共用网络，所以它的 Chrome 能打开代理启动的开发服务。代理不能占用 3000 和 9223 端口。账号、Claude 登录状态和设置都保存在 `agent-home` 卷里。
+Steel 和 AgentWeb 容器共用网络，所以它的 Chrome 能打开代理启动的开发服务。代理不能占用 3000 和 9223 端口。Steel 从固定的提交构建，因为它只发布 `latest` 镜像，而紧接着的下一个提交会破坏实时画面。要更换版本，修改 `STEEL_REF`。账号、Claude 登录状态和设置都保存在 `agent-home` 卷里。
 
-3000 和 9223 端口本身没有登录校验，能访问到它们的人就能操作浏览器。在有公网地址的机器上设置 `BIND_ADDRESS=0.0.0.0` 前，请先考虑这一点。
+Steel 本身没有登录校验，能访问到 3000 端口的人就能操作浏览器。在有公网地址的机器上不要设置 `BIND_ADDRESS=0.0.0.0`，请改用 HTTPS。
+
+#### 使用域名和 HTTPS
+
+1. 把你的域名和 `steel.<域名>` 指向这台机器，并在防火墙放行 80 和 443 端口。
+2. 在 `.env` 里加上下面的配置，然后运行 `docker compose up -d`：
+
+```bash
+COMPOSE_PROFILES=https
+PUBLIC_DOMAIN=example.com
+STEEL_DOMAIN=steel.example.com
+STEEL_USE_SSL=true
+BIND_ADDRESS=127.0.0.1
+```
+
+Caddy 会自动申请和续期证书，并在提供 Steel 前通过域名 Cookie 校验你的 AgentWeb 登录状态。公网只开放 80 和 443。通过 SSH 隧道，AgentWeb 仍可在 `127.0.0.1:3001` 访问。
 
 ## 配置
 

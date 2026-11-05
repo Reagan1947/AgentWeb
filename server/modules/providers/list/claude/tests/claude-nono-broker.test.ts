@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
-import { buildBrokeredNonoProfile, parseNonoPathList, resolveWorktreeGitDir } from '@/modules/providers/list/claude/claude-nono-broker.js';
+import { buildBrokeredNonoProfile, parseNonoPathList, resolveToolReadFiles, resolveWorktreeGitDir } from '@/modules/providers/list/claude/claude-nono-broker.js';
 
 test('brokered nono profile names env vars and omits the secret', () => {
   const secret = 'super-secret-value';
@@ -109,4 +109,17 @@ test('parseNonoPathList keeps absolute paths and drops relative ones and the hom
     parseNonoPathList(`/opt/megacmd: relative/path ::${os.homedir()}:/srv/tool`),
     ['/opt/megacmd', '/srv/tool'],
   );
+});
+
+test('resolveToolReadFiles keeps symlink targets and skips missing files', () => {
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'nono-read-files-')));
+  try {
+    const target = path.join(root, 'target');
+    const link = path.join(root, 'link');
+    fs.writeFileSync(target, 'id');
+    fs.symlinkSync(target, link);
+    assert.deepEqual(resolveToolReadFiles([link, path.join(root, 'missing')]), [link, target]);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });

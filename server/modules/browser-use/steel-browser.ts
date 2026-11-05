@@ -231,6 +231,23 @@ function withLiveViewParams(debugUrl: string): string {
   return url.toString();
 }
 
+/**
+ * The address AgentWeb's server uses for CDP. Self-hosted Steel builds it from its
+ * public DOMAIN, which may sit behind a login this server cannot pass, so a bare
+ * websocket goes to the configured Steel address. Steel Cloud puts the session id
+ * in its connect URL and is left alone. launchAgentBrowser connects to the result.
+ */
+function resolveSteelCdpUrl(session: SteelSession, baseUrl: string): string {
+  if (session.websocketUrl.includes(session.id)) {
+    return session.websocketUrl;
+  }
+  const cdpUrl = new URL(session.websocketUrl);
+  const base = new URL(baseUrl);
+  cdpUrl.protocol = base.protocol === 'https:' ? 'wss:' : 'ws:';
+  cdpUrl.host = base.host;
+  return cdpUrl.toString();
+}
+
 async function createSteelSession(
   baseUrl: string,
   options: {
@@ -375,7 +392,7 @@ export async function launchAgentBrowser(input: LaunchAgentBrowserInput): Promis
       });
       createdId = steel.id;
       const debugUrl = withLiveViewParams(steel.debugUrl);
-      const browser = await input.playwright.chromium.connectOverCDP(steel.websocketUrl);
+      const browser = await input.playwright.chromium.connectOverCDP(resolveSteelCdpUrl(steel, input.steelBaseUrl));
       const context = browser.contexts?.()[0];
       if (!context) {
         throw new Error('Steel session did not expose a browser context.');

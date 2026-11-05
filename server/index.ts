@@ -124,7 +124,12 @@ createWebSocketServer(server, {
     getPluginPort,
 });
 
-app.use(cors({ exposedHeaders: ['X-Refreshed-Token', 'X-Auth-Error'] }));
+// CORS_ORIGINS limits cross-origin callers once the app has a public address. Unset keeps it open.
+const corsOrigins = process.env.CORS_ORIGINS?.split(',').map((origin) => origin.trim()).filter(Boolean);
+app.use(cors({
+    exposedHeaders: ['X-Refreshed-Token', 'X-Auth-Error'],
+    ...(corsOrigins?.length ? { origin: corsOrigins } : {}),
+}));
 app.use(express.json({
     limit: '50mb',
     type: (req) => {

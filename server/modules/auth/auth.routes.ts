@@ -12,6 +12,10 @@ type AuthenticatedRequest = express.Request & { user?: unknown };
 export function createAuthRouter(
   service: ReturnType<typeof createAuthService>,
   authenticateToken: RequestHandler,
+  proxySession: {
+    isSignedIn(cookieHeader: string | undefined): boolean;
+    clear(response: express.Response): void;
+  },
 ): express.Router {
   const router = express.Router();
 
@@ -50,7 +54,13 @@ export function createAuthRouter(
   });
 
   router.post('/logout', authenticateToken, (_req, res) => {
+    proxySession.clear(res);
     res.json(service.logout());
+  });
+
+  // Called by the reverse proxy in front of services with no login of their own.
+  router.get('/proxy-verify', (req, res) => {
+    res.sendStatus(proxySession.isSignedIn(req.headers.cookie) ? 204 : 401);
   });
 
   return router;
